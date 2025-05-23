@@ -1,0 +1,10 @@
+*
+!*/
+!*.cpp
+!*.hpp
+!*.tpp
+!Makefile
+!.gitignore
+!*.md
+!*.yml
+!.clangd
