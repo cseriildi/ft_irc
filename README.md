@@ -1,4 +1,4 @@
-# About the cub3d project
+# About the ft_irc project
 
 We collaborated on this with [Daniel](https://github.com/Csicsi).
 
