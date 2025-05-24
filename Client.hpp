@@ -2,13 +2,9 @@
 #define CLIENT_HPP
 
 #include <iostream>
-#include <sstream>
-#include <cstring>
-#include <unistd.h>
+#include <cstring> // for memset
 #include <cerrno>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
+#include <arpa/inet.h> // for send, recv
 
 class Client {
 private:

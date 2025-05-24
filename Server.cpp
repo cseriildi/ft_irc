@@ -1,13 +1,4 @@
 #include "Server.hpp"
-#include <iostream>
-#include <sstream>
-#include <cstring>
-#include <unistd.h>
-#include <cerrno>
-#include <netinet/in.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
 
 Server::Server() : _port(""), _sockfd_ipv4(-1), _res(NULL) {}
 
@@ -56,9 +47,7 @@ void Server::init(const std::string& port) {
 void Server::bind_and_listen(const struct addrinfo* res) {
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (sockfd == -1) {
-		std::ostringstream oss;
-		oss << "socket error on port " << _port << ": " << strerror(errno);
-		throw std::runtime_error(oss.str());
+		throw std::runtime_error("socket error: " + std::string(strerror(errno)));
 	}
 
 	int yes = 1;
@@ -66,16 +55,12 @@ void Server::bind_and_listen(const struct addrinfo* res) {
 
 	if (bind(sockfd, res->ai_addr, res->ai_addrlen) == -1) {
 		close(sockfd);
-		std::ostringstream oss;
-		oss << "bind error on port " << _port << ": " << strerror(errno);
-		throw std::runtime_error(oss.str());
+		throw std::runtime_error("bind error: " + std::string(strerror(errno)));
 	}
 
 	if (listen(sockfd, BACKLOG) == -1) {
 		close(sockfd);
-		std::ostringstream oss;
-		oss << "listen error on port " << _port << ": " << strerror(errno);
-		throw std::runtime_error(oss.str());
+		throw std::runtime_error("listen error: " + std::string(strerror(errno)));
 	}
 
 	_sockfd_ipv4 = sockfd;
