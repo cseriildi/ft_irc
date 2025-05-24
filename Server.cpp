@@ -12,6 +12,7 @@
 Server::Server() : _port(""), _sockfd_ipv4(-1), _res(NULL) {}
 
 Server::~Server() {
+	delete _client;
 	cleanup();
 }
 
@@ -93,19 +94,15 @@ void Server::run() {
 	int client_sockfd = accept(_sockfd_ipv4, (struct sockaddr*)&client_addr, &addr_len);
 
 	if (client_sockfd == -1) {
-		std::ostringstream oss;
-		oss << "accept error on port " << _port << ": " << strerror(errno);
-		throw std::runtime_error(oss.str());
+		throw std::runtime_error("accept error: " + std::string(strerror(errno)));
 	}
 
 	std::cout << "Client connected" << std::endl;
 
-	std::string welcome = "NOTICE AUTH :Connected to test IRC server\r\n";
-	ssize_t sent = send(client_sockfd, welcome.c_str(), welcome.length(), 0);
-	if (sent == -1) {
-		close(client_sockfd);
-		throw std::runtime_error("send error: " + std::string(strerror(errno)));
-	}
+	_client = new Client(client_sockfd);
+	_client->handle();
 
 	close(client_sockfd);
+	delete _client;
+	_client = NULL;
 }

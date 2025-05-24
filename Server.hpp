@@ -10,14 +10,18 @@
 #include <cstring>
 #include <cerrno>
 #include <stdexcept>
+#include "Client.hpp"
 
 #define BACKLOG 10
+
+class Client;
 
 class Server {
 private:
 	std::string		_port;
 	int				_sockfd_ipv4;
 	struct addrinfo	*_res;
+	Client			*_client;
 
 	Server(const Server &other);
 	Server &operator=(const Server &other);
