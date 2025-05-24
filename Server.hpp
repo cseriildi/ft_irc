@@ -13,11 +13,14 @@
 
 class Client;
 
+/**
+ * @brief this is just a test of doxygen comments
+ */
 class Server {
-private:
-	std::string		_port;
-	int				_sockfd_ipv4;
-	struct addrinfo	*_res;
+private: // also trying normal comments
+	std::string		_port; /// doxygen
+	int				_sockfd_ipv4; /* normal */
+	struct addrinfo	*_res; ///< doxygen
 	Client			*_client;
 
 	Server(const Server &other);
