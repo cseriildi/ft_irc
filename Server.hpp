@@ -15,10 +15,10 @@ class Client;
 
 class Server {
 private:
-	std::string		_port; 
-	int				_sockfd_ipv4; 
-	struct addrinfo	*_res; 
-	Client			*_client; 
+	std::string		_port;
+	int				_sockfd_ipv4;
+	struct addrinfo	*_res;
+	Client			*_client;
 
 	Server(const Server &other);
 	Server &operator=(const Server &other);
