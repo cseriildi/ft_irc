@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# Usage: ./sync_branches.sh "<commit message>"
+# Usage: ./sync.sh "Commit message"
+COMMIT_MSG="${1:-Sync branches}"
 
-COMMIT_MSG="${1:-Sync doxygen and clean branches}"
-
-DOX_BRANCH="server-doxygen"
+DOXYGEN_BRANCH="server-doxygen"
 CLEAN_BRANCH="server"
 
 set -e
@@ -12,33 +11,48 @@ set -e
 REPO_DIR=$(git rev-parse --show-toplevel)
 cd "$REPO_DIR"
 
-echo "Committing and pushing changes on $DOX_BRANCH..."
-git checkout "$DOX_BRANCH"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-if ! git diff --cached --quiet || ! git diff --quiet; then
+if [[ "$CURRENT_BRANCH" != "$DOXYGEN_BRANCH" && "$CURRENT_BRANCH" != "$CLEAN_BRANCH" ]]; then
+	echo "❌ You must be on '$DOXYGEN_BRANCH' or '$CLEAN_BRANCH' to sync."
+	exit 1
+fi
+
+if ! git diff --quiet || ! git diff --cached --quiet; then
+	echo "📦 Committing changes on $CURRENT_BRANCH..."
 	git add .
 	git commit -m "$COMMIT_MSG"
 fi
 
-git push origin "$DOX_BRANCH"
+git push origin "$CURRENT_BRANCH"
 
-echo "Syncing $CLEAN_BRANCH with $DOX_BRANCH..."
-git checkout "$CLEAN_BRANCH"
-git pull origin "$CLEAN_BRANCH"
-git merge "$DOX_BRANCH" --no-commit
-
-echo "Stripping Doxygen comments..."
-find . \( -name '*.cpp' -o -name '*.hpp' \) -print0 | while IFS= read -r -d '' file; do
-	sed -i '/^\s*\/\*\*/,/^\s*\*\//d' "$file"    # Remove /** ... */
-	sed -i '/^\s*\/\/\//d' "$file"               # Remove /// lines
-	sed -i 's/\/\/\/<.*$//' "$file"              # Remove ///< inline
-done
-
-if ! git diff --cached --quiet || ! git diff --quiet; then
-	git add .
-	git commit -m "$COMMIT_MSG"
+if [ "$CURRENT_BRANCH" = "$DOXYGEN_BRANCH" ]; then
+	FROM="$DOXYGEN_BRANCH"
+	TO="$CLEAN_BRANCH"
+	STRIP=true
+elif [ "$CURRENT_BRANCH" = "$CLEAN_BRANCH" ]; then
+	FROM="$CLEAN_BRANCH"
+	TO="$DOXYGEN_BRANCH"
+	STRIP=false
 fi
 
-git push origin "$CLEAN_BRANCH"
+echo "🔁 Syncing $TO with $FROM..."
+git checkout "$TO"
+git pull origin "$TO"
+git merge "$FROM" --no-commit
 
-echo "Both branches pushed successfully!"
+if [ "$STRIP" = true ]; then
+	echo "🧹 Stripping Doxygen comments..."
+	find . \( -name '*.cpp' -o -name '*.hpp' \) -print0 | while IFS= read -r -d '' file; do
+		sed -i '/^\s*\/\*\*/,/^\s*\*\//d' "$file"
+		sed -i '/^\s*\/\/\//d' "$file"
+		sed -i 's/\/\/\/<.*$//' "$file"
+	done
+fi
+
+git add .
+git commit -m "$COMMIT_MSG" || echo "✅ No new changes to commit."
+
+git push origin "$TO"
+
+echo "✅ Both branches are now in sync!"
