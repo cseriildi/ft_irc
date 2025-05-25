@@ -8,7 +8,7 @@ void Client::handle() {
 	char buffer[512]; //standard message size for irc
 	std::memset(buffer, 0, sizeof(buffer));
 
-	//recive on the saved socket
+	//receive on the saved socket
 	ssize_t received = recv(_sockfd_ipv4, buffer, sizeof(buffer) - 1, 0);
 	if (received <= 0) {
 		std::cout << "Client disconnected or error" << std::endl;
