@@ -8,4 +8,3 @@
 !*.md
 !*.yml
 !.clangd
-!sync.sh
