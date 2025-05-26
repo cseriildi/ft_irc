@@ -8,12 +8,14 @@
 
 class Client {
 private:
-	int _sockfd_ipv4; 
+	int _sockfd_ipv4;
 	//Instance of IRC interpeter, called with a string, returns a string
 
 	Client();
 	Client(const Client &other);
 	Client &operator=(const Client &other);
+
+	bool _sendAll(const std::string &message);
 public:
 	Client(int sockfd);
 	~Client();
