@@ -21,8 +21,7 @@ void Client::handle() {
 	std::memset(buffer, 0, sizeof(buffer));
 	ssize_t received = recv(_sockfd_ipv4, buffer, sizeof(buffer) - 1, 0);
 	if (received <= 0) {
-		std::cout << "Client disconnected or error" << std::endl;
-		return;
+		throw std::runtime_error("Error receiving data: " + std::string(strerror(errno)));
 	}
 
 	std::string msg(buffer);
@@ -33,26 +32,25 @@ void Client::handle() {
 
 	if (!response.empty()) {
 		if (!_sendAll(response)) {
-			std::cerr << "Failed to send response." << std::endl;
-			return;
+			throw std::runtime_error("Error sending response: " + std::string(strerror(errno)));
 		}
 	}
 }
 
 
 bool Client::_sendAll(const std::string &message) {
-	size_t sentLen = 0;
-	size_t msgLen = message.length();
+	size_t sent_len = 0;
+	size_t msg_len = message.length();
 
-	while (sentLen < msgLen) {
+	while (sent_len < msg_len) {
 		// send might not send all bytes at once, so we loop until all bytes are sent
 		// returns the number of bytes sent, or -1 on error
-		ssize_t sent = send(_sockfd_ipv4, message.c_str() + sentLen, msgLen - sentLen, 0);
+		ssize_t sent = send(_sockfd_ipv4, message.c_str() + sent_len, msg_len - sent_len, 0);
 		if (sent == -1) {
 			std::cerr << "Error sending message: " << strerror(errno) << std::endl;
 			return false;
 		}
-		sentLen += sent;
+		sent_len += sent;
 	}
 
 	return true;

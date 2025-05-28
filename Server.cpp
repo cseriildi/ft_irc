@@ -1,24 +1,6 @@
 #include "Server.hpp"
 
-Server::Server() : _port(""), _sockfd_ipv4(-1), _res(NULL) {}
-
-Server::~Server() {
-	delete _client;
-	cleanup();
-}
-
-void Server::cleanup() {
-	if (_res) {
-		freeaddrinfo(_res); //free the linked list, from netdb.h
-		_res = NULL;
-	}
-	if (_sockfd_ipv4 != -1) {
-		close(_sockfd_ipv4);
-		_sockfd_ipv4 = -1;
-	}
-}
-
-void Server::init(const std::string& port) {
+Server::Server(const std::string& port) : _port(""), _sockfd_ipv4(-1), _res(NULL) {
 	_port = port;
 
 	struct addrinfo hints; //create hints struct for getaddrinfo
@@ -44,6 +26,26 @@ void Server::init(const std::string& port) {
 			continue;
 		}
 	}
+}
+
+Server::~Server() {
+	cleanup();
+}
+
+void Server::cleanup() {
+	if (_res) {
+		freeaddrinfo(_res); //free the linked list, from netdb.h
+		_res = NULL;
+	}
+	if (_sockfd_ipv4 != -1) {
+		close(_sockfd_ipv4);
+		_sockfd_ipv4 = -1;
+	}
+	std::map<int, Client*>::iterator it;
+	for (it = _clients.begin(); it != _clients.end(); ++it) {
+		delete it->second;
+	}
+	_clients.clear();
 }
 
 void Server::bind_and_listen(const struct addrinfo* res) {
@@ -74,19 +76,76 @@ void Server::bind_and_listen(const struct addrinfo* res) {
 }
 
 void Server::run() {
-	struct sockaddr_storage client_addr;
-	socklen_t addr_len = sizeof(client_addr);
-	//each client recives a new socketfd, accept is blocking, later will use poll or select
-	int client_sockfd = accept(_sockfd_ipv4, (struct sockaddr*)&client_addr, &addr_len);
+	// add server socket to pollfds
+	addPollFd(_sockfd_ipv4, POLLIN);
 
-	if (client_sockfd == -1) {
-		throw std::runtime_error("accept error: " + std::string(strerror(errno)));
+	while (true) {
+		int n_poll = poll(_pollfds.data(), _pollfds.size(), TIMEOUT);
+
+		if (n_poll == -1) {
+			std::cerr << "Poll error: " << strerror(errno) << std::endl;
+			continue;
+		}
+
+		for (size_t i = 0; i < _pollfds.size(); ++i) {
+			// If the returned events POLLIN bit is set, there is data to read
+			if (_pollfds[i].revents & POLLIN) {
+				// if the socket is still the server socket, it has not been accept()-ed yet
+				if (_pollfds[i].fd == _sockfd_ipv4) {
+					handleNewConnection();
+				} else {
+					if (!handleClientActivity(i)) {
+						--i;
+					}
+				}
+			}
+		}
+	}
+}
+
+void Server::addPollFd(int fd, short events) {
+	struct pollfd pfd;
+	pfd.fd = fd;
+	pfd.events = events;
+	pfd.revents = 0; //return events, to be filled by poll
+	_pollfds.push_back(pfd);
+}
+
+void Server::handleNewConnection() {
+	struct sockaddr_storage client_addr;
+	socklen_t addrLen = sizeof(client_addr);
+	// should not block now, since poll tells us there is a connection pending
+	int client_fd = accept(_sockfd_ipv4, (struct sockaddr*)&client_addr, &addrLen);
+
+	if (client_fd == -1) {
+		std::cerr << "Accept error: " << strerror(errno) << std::endl;
+		return;
 	}
 
-	_client = new Client(client_sockfd);
-	_client->handle();
+	std::cout << "New client connected: " << client_fd << std::endl;
+	_clients[client_fd] = new Client(client_fd);
+	addPollFd(client_fd, POLLIN);
+}
 
-	close(client_sockfd);
-	delete _client;
-	_client = NULL;
+bool Server::handleClientActivity(size_t index) {
+	int client_fd = _pollfds[index].fd;
+	Client* client = _clients[client_fd];
+
+	if (!client)
+		return true;
+
+	try {
+		client->handle();
+	} catch (const std::exception& e) {
+		std::cerr << "Client error on fd " << client_fd << ": " << e.what() << std::endl;
+		removeClient(index, client_fd);
+		return false;
+	}
+	return true;
+}
+
+void Server::removeClient(size_t index, int fd) {
+	delete _clients[fd];
+	_clients.erase(fd);
+	_pollfds.erase(_pollfds.begin() + index);
 }
