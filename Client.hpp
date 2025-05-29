@@ -1,17 +1,38 @@
 #pragma once
 
+#include "Message.hpp"
 #include <string>
 #include <arpa/inet.h> // for send, recv
 
 #define BUFFER_SIZE 512 // standard message size for IRC
 
+class Server;
+
 class Client {
 	public:
 
-		Client(int sockfd);
+		Client(int sockfd, Server *server);
 		~Client();
 
-		void handle();
+		void		handle();
+		std::string	receive() const;
+
+		Message nick(const std::string &msg);
+		Message user(const std::string &msg);
+		Message pass(const std::string &msg);
+		Message who(const std::string &msg);
+		Message privmsg(const std::string &msg);
+		Message ping(const std::string &msg);
+
+		// Channel commands
+		Message join(const std::string &msg);
+		Message part(const std::string &msg);
+		Message kick(const std::string &msg);
+		Message invite(const std::string &msg);
+		Message topic(const std::string &msg);
+		Message mode(const std::string &msg);
+		Message list(const std::string &msg);
+		Message names(const std::string &msg);
 
 	private:
 
@@ -23,4 +44,5 @@ class Client {
 		bool	_sendAll(const std::string &message) const;
 
 		int		_clientFd;
+		Server*	_server;
 };

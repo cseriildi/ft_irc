@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-Client::Client(int sockfd) : _clientFd(sockfd) {}
+Client::Client(int sockfd, Server* server) : _clientFd(sockfd),  _server(server) {}
 
 Client::~Client() {}
 
@@ -25,7 +25,7 @@ std::string mockIRC(const std::string& input) {
 }
 // NOLINTEND
 
-void Client::handle() {
+std::string Client::receive() const {
 	char buffer[BUFFER_SIZE];
 	memset(buffer, 0, sizeof(buffer)); //NOLINT
 
@@ -40,6 +40,27 @@ void Client::handle() {
 	const std::string msg(buffer, received); //NOLINT
 
 	std::cout << "Received: " << msg;
+	return msg;
+}
+
+void Client::handle() {
+	const std::string msg = receive();
+
+	
+	//TODO: PASS
+	//TODO: NICK
+	//TODO: WHO
+	//TODO: USER
+	//TODO: JOIN
+	//TODO: PRIVMSG
+	//TODO: PING
+	//TODO: MODE
+	//TODO: TOPIC
+	//TODO: KICK
+	//TODO: INVITE
+	//TODO: PART
+
+	//TODO: broadcast if in channel
 
 	const std::string response = mockIRC(msg);
 
