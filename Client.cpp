@@ -31,8 +31,7 @@ void Client::handle() {
 
 	const ssize_t received = recv(_sockfd_ipv4, buffer, sizeof(buffer) - 1, 0); //NOLINT
 	if (received == 0) {
-		std::cout << "Connection closed by peer.\n";
-		return;
+		throw std::runtime_error("Client disconnected");
 	}
 	if (received == -1) {
 		throw std::runtime_error("Error receiving data: " + std::string(strerror(errno)));

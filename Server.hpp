@@ -17,6 +17,7 @@ class Server {
 private:
 	std::string		_port;
 	int				_sockfd_ipv4;
+	int				_sockfd_ipv6;
 	struct addrinfo	*_res;
 	std::vector<struct pollfd> _pollfds; // vector of the fds we are polling
 	std::map<int, Client*> _clients; // with client_fd as key
@@ -26,7 +27,7 @@ private:
 	Server &operator=(const Server &other);
 
 	void _cleanup();
-	void _bind_and_listen(const struct addrinfo *res);
+	static int _bind_and_listen(const struct addrinfo *res);
 	void _addPollFd(int fd, short events);
 	void _handleNewConnection();
 	bool _handleClientActivity(size_t index);
