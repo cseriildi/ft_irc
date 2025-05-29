@@ -145,6 +145,7 @@ bool Server::handleClientActivity(size_t index) {
 }
 
 void Server::removeClient(size_t index, int fd) {
+	close(fd); // Close the file descriptor to prevent leaks
 	delete _clients[fd];
 	_clients.erase(fd);
 	_pollfds.erase(_pollfds.begin() + index);
