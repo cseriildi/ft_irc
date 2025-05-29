@@ -1,6 +1,6 @@
 #include "Server.hpp"
 
-Server::Server(const std::string& port) : _port(""), _sockfd_ipv4(-1), _res(NULL) {
+Server::Server(const std::string& port) : _sockfd_ipv4(-1), _res(NULL) {
 	_port = port;
 
 	struct addrinfo hints; //create hints struct for getaddrinfo
