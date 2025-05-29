@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include <arpa/inet.h>
 #include <asm-generic/socket.h>
 #include <cerrno>
 #include <cstddef>
@@ -6,6 +7,7 @@
 #include <exception>
 #include <map>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <stdexcept>
 #include <string>
 #include <iostream>
@@ -13,11 +15,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-Server::Server(const std::string& port) : _port(port), _sockfd_ipv4(-1), _res(NULL) {
+Server::Server(const std::string& port) : _port(port), _sockfd_ipv4(-1), _sockfd_ipv6(-1), _res(NULL) {
 
 	struct addrinfo hints = {}; //create hints struct for getaddrinfo
 	std::memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET; //IPv4 only. AF_INET6 for IPv6, AF_UNSPEC for both
+	hints.ai_family = AF_UNSPEC; //IPv4 only. AF_INET6 for IPv6, AF_UNSPEC for both
 	hints.ai_socktype = SOCK_STREAM; //TCP
 	hints.ai_flags = AI_PASSIVE; //localhost address
 
@@ -30,8 +32,13 @@ Server::Server(const std::string& port) : _port(port), _sockfd_ipv4(-1), _res(NU
 
 	for (struct addrinfo* p = _res; p != NULL; p = p->ai_next) {
 		try {
-			_bind_and_listen(p);
-			break;
+			if (p->ai_family == AF_INET) {
+				_sockfd_ipv4 = _bind_and_listen(p);
+				std::cout << "Server is listening on port " << _port << " (IPv4)\n";
+			} else if (p->ai_family == AF_INET6) {
+				_sockfd_ipv4 = _bind_and_listen(p);
+				std::cout << "Server is listening on port " << _port << " (IPv6)\n";
+			}
 		} catch (const std::runtime_error& e) {
 			_cleanup();
 			std::cerr << "Bind/listen error: " << e.what() << "\n";
@@ -60,7 +67,7 @@ void Server::_cleanup() {
 	_clients.clear();
 }
 
-void Server::_bind_and_listen(const struct addrinfo* res) {
+int Server::_bind_and_listen(const struct addrinfo* res) {
 	//Create a socket we can bind to, uses the nodes from getaddrinfo
 	const int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (sockfd == -1) {
@@ -70,6 +77,10 @@ void Server::_bind_and_listen(const struct addrinfo* res) {
 	int yes = 1;
 	//SOL_SOCKET: socket level, SO_REUSEADDR: option to reuse the address, yes: enable it
 	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+	if (res->ai_family == AF_INET6) {
+		// For IPv6, we also set the IPV6_V6ONLY option to allow dual-stack sockets
+		setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes));
+	}
 
 	//Bind the socket to the address and port
 	if (bind(sockfd, res->ai_addr, res->ai_addrlen) == -1) {
@@ -83,8 +94,7 @@ void Server::_bind_and_listen(const struct addrinfo* res) {
 		throw std::runtime_error("listen error: " + std::string(strerror(errno)));
 	}
 
-	//Store the socket file descriptor for IPv4
-	_sockfd_ipv4 = sockfd;
+	return sockfd;
 }
 
 void Server::run() {
