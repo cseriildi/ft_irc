@@ -1,7 +1,7 @@
 CompileFlags:
    Add: [-Wall, -Wextra, -Werror, --std=c++98, -pedantic-errors, --language=c++]
    Compiler: c++
- 
+
 Diagnostics:
    ClangTidy:
      Add:
@@ -15,10 +15,11 @@ Diagnostics:
        ]
      Remove: [cppcoreguidelines-avoid-magic-numbers,
               readability-identifier-length,
-              readability-braces-around-statements]
+              readability-braces-around-statements,
+              bugprone-easily-swappable-parameters]
      FastCheckFilter: None
    MissingIncludes: Strict
- 
+
 InlayHints:
    BlockEnd: No
    Designators: Yes

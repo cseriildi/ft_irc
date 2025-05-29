@@ -9,7 +9,7 @@ int main(int argc, char **argv) try {
 	if (argc != 3)
 		throw std::invalid_argument("Usage: ./ircserv <port> <password>");
 
-	Server server(argv[1]);
+	Server server(argv[1]); //NOLINT
 	server.run();
 
 	return 0;

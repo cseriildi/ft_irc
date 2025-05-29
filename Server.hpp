@@ -1,15 +1,10 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include <iostream>
-#include <netdb.h> // for getaddrinfo, freeaddrinfo
-#include <unistd.h> // for close
-#include <cstring>
-#include <cerrno>
-#include <stdexcept>
+#include <cstddef>
+#include <string>
 #include <vector>
 #include <map>
-#include <poll.h>
 #include "Client.hpp"
 
 #define BACKLOG 10
@@ -30,12 +25,12 @@ private:
 	Server(const Server &other);
 	Server &operator=(const Server &other);
 
-	void cleanup();
-	void bind_and_listen(const struct addrinfo *res);
-	void addPollFd(int fd, short events);
-	void handleNewConnection();
-	bool handleClientActivity(size_t index);
-	void removeClient(size_t index, int cfd);
+	void _cleanup();
+	void _bind_and_listen(const struct addrinfo *res);
+	void _addPollFd(int fd, short events);
+	void _handleNewConnection();
+	bool _handleClientActivity(size_t index);
+	void _removeClient(size_t index, int cfd);
 public:
 	Server(const std::string &port);
 	~Server();

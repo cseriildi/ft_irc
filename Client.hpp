@@ -1,10 +1,10 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
-#include <iostream>
-#include <cstring> // for memset
-#include <cerrno>
+#include <string>
 #include <arpa/inet.h> // for send, recv
+
+#define BUFFER_SIZE 512 // standard message size for IRC
 
 class Client {
 private:
@@ -15,7 +15,7 @@ private:
 	Client(const Client &other);
 	Client &operator=(const Client &other);
 
-	bool _sendAll(const std::string &message);
+	bool _sendAll(const std::string &message) const;
 public:
 	Client(int sockfd);
 	~Client();
