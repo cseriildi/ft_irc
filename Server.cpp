@@ -19,7 +19,7 @@ Server::Server(const std::string& port) : _port(port), _sockfd_ipv4(-1), _sockfd
 
 	struct addrinfo hints = {}; //create hints struct for getaddrinfo
 	std::memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC; //IPv4 only. AF_INET6 for IPv6, AF_UNSPEC for both
+	hints.ai_family = AF_UNSPEC; //AF_INET for IPv4 only, AF_INET6 for IPv6, AF_UNSPEC for both
 	hints.ai_socktype = SOCK_STREAM; //TCP
 	hints.ai_flags = AI_PASSIVE; //localhost address
 
@@ -100,6 +100,7 @@ int Server::_bind_and_listen(const struct addrinfo* res) {
 void Server::run() {
 	// add server socket to pollfds
 	_addPollFd(_sockfd_ipv4, POLLIN);
+	_addPollFd(_sockfd_ipv6, POLLIN);
 
 	while (true) {
 		const int n_poll = poll(_pollfds.data(), _pollfds.size(), TIMEOUT);
