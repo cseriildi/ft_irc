@@ -20,7 +20,10 @@ void Client::handle() {
 	char buffer[512]; //standard message size for irc
 	std::memset(buffer, 0, sizeof(buffer));
 	ssize_t received = recv(_sockfd_ipv4, buffer, sizeof(buffer) - 1, 0);
-	if (received <= 0) {
+	if (received == 0) {
+		std::cout << "Connection closed by peer." << std::endl;
+		return; // Clean disconnect
+	} else if (received == -1) {
 		throw std::runtime_error("Error receiving data: " + std::string(strerror(errno)));
 	}
 
