@@ -36,7 +36,7 @@ Server::Server(const std::string& port) : _port(port), _sockfd_ipv4(-1), _sockfd
 				_sockfd_ipv4 = _bind_and_listen(p);
 				std::cout << "Server is listening on port " << _port << " (IPv4)\n";
 			} else if (p->ai_family == AF_INET6) {
-				_sockfd_ipv4 = _bind_and_listen(p);
+				_sockfd_ipv6 = _bind_and_listen(p);
 				std::cout << "Server is listening on port " << _port << " (IPv6)\n";
 			}
 		} catch (const std::runtime_error& e) {
