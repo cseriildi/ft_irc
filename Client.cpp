@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-Client::Client(int sockfd) : _sockfd_ipv4(sockfd) {}
+Client::Client(int sockfd) : _clientFd(sockfd) {}
 
 Client::~Client() {}
 
@@ -29,7 +29,7 @@ void Client::handle() {
 	char buffer[BUFFER_SIZE];
 	memset(buffer, 0, sizeof(buffer)); //NOLINT
 
-	const ssize_t received = recv(_sockfd_ipv4, buffer, sizeof(buffer) - 1, 0); //NOLINT
+	const ssize_t received = recv(_clientFd, buffer, sizeof(buffer) - 1, 0); //NOLINT
 	if (received == 0) {
 		throw std::runtime_error("Client disconnected");
 	}
@@ -57,7 +57,7 @@ bool Client::_sendAll(const std::string &message) const {
 	while (sent_len < msg_len) {
 		// send might not send all bytes at once, so we loop until all bytes are sent
 		// returns the number of bytes sent, or -1 on error
-		const ssize_t sent = send(_sockfd_ipv4, message.c_str() + sent_len, msg_len - sent_len, 0); //NOLINT
+		const ssize_t sent = send(_clientFd, message.c_str() + sent_len, msg_len - sent_len, 0); //NOLINT
 		if (sent == -1) {
 			std::cerr << "Error sending message: " << strerror(errno) << "\n";
 			return false;
