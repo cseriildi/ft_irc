@@ -17,7 +17,8 @@ class Server {
 		Server(const std::string &port);
 		~Server();
 
-		void run();
+		void	run();
+		void	sendToClient(Client *client, const std::string &msg);
 
 	private:
 
@@ -32,7 +33,6 @@ class Server {
 		bool		_handleClientActivity(size_t index);
 		void		_removeClient(size_t index, int cfd);
 		void		_handlePollEvents();
-		void		_sendToClient(Client *client, const std::string &msg);
 		void		_sendToChannel(Channel *channel, const std::string &msg, Client *sender = NULL);
 
 		std::string						_port;

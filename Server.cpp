@@ -159,9 +159,6 @@ void Server::_handleNewConnection(int sockfd) {
 		return;
 	}
 
-	// Set the client socket to non-blocking mode
-	fcntl(client_fd, F_SETFL, O_NONBLOCK); //NOLINT
-
 	std::cout << "New client connected: " << client_fd << "\n";
 	_clients[client_fd] = new Client(client_fd, this);
 	_addPollFd(client_fd, POLLIN);
@@ -177,9 +174,6 @@ bool Server::_handleClientActivity(size_t index) {
 	if ((_pollFds[index].revents & POLLIN) != 0) {
 		try {
 			client->receive();
-			if (client->wantsToWrite()) {
-				_pollFds[index].events |= POLLOUT;
-			}
 		} catch (const std::runtime_error& e) {
 			std::cerr << "Receive error on fd " << client_fd << ": " << e.what() << "\n";
 			_removeClient(index, client_fd);
@@ -208,7 +202,7 @@ void Server::_removeClient(size_t index, int fd) {
 	_pollFds.erase(_pollFds.begin() + index); //NOLINT
 }
 
-void Server::_sendToClient(Client* client, const std::string& msg) {
+void Server::sendToClient(Client* client, const std::string& msg) {
 	if (client == NULL || msg.empty()) {
 		return;
 	}
@@ -229,7 +223,7 @@ void Server::_sendToChannel(Channel* channel, const std::string& msg, Client* se
 	for (std::map<int, Client*>::const_iterator it = clients.begin(); it != clients.end(); ++it) {
 		Client* client = it->second;
 		if (client != sender) {
-			_sendToClient(client, msg);
+			sendToClient(client, msg);
 		}
 	}
 }

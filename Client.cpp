@@ -6,6 +6,7 @@
 #include <cstring>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include "Server.hpp"
 
 Client::Client(int sockfd, Server* server) : _clientFd(sockfd),  _server(server) {}
 
@@ -16,11 +17,15 @@ std::string mockIRC(const std::string& input) {
 	if (input.find("CAP LS") == 0) {
 		return "CAP * LS :\r\n";
 	}
-
+	if (input.find("NICK") == 0) {
+		return "";
+	}
+	if (input.find("USER") == 0) {
+		return ":ircserv 001 <nick> :Welcome to ft_irc!\r\n";
+	}
 	if (input.find("PING") == 0) {
 		return "PONG " + input.substr(5);
 	}
-
 	return "";
 }
 // NOLINTEND
@@ -44,7 +49,7 @@ void Client::receive() {
 		std::string const response = mockIRC(line);
 		std::cout << "Received: " << line << "response: " << response << '\n';
 		if (!response.empty()) {
-			_outBuffer += response;
+			_server->sendToClient(this, response);
 		}
 		_inBuffer.erase(0, pos + 2);
 	}
