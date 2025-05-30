@@ -84,3 +84,11 @@ void Client::answer() {
 bool Client::wantsToWrite() const {
 	return !_outBuffer.empty();
 }
+
+void Client::appendToOutBuffer(const std::string &msg) {
+	_outBuffer += msg;
+}
+
+int Client::getFd() const {
+	return _clientFd;
+}

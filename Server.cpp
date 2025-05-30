@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "Channel.hpp"
 #include "Client.hpp"
 #include <arpa/inet.h>
 #include <asm-generic/socket.h>
@@ -205,4 +206,30 @@ void Server::_removeClient(size_t index, int fd) {
 	delete _clients[fd];
 	_clients.erase(fd);
 	_pollFds.erase(_pollFds.begin() + index); //NOLINT
+}
+
+void Server::_sendToClient(Client* client, const std::string& msg) {
+	if (client == NULL || msg.empty()) {
+		return;
+	}
+	client->appendToOutBuffer(msg);
+	for (size_t i = 0; i < _pollFds.size(); ++i) {
+		if (_pollFds[i].fd == client->getFd()) {
+			_pollFds[i].events |= POLLOUT;
+			break;
+		}
+	}
+}
+
+void Server::_sendToChannel(Channel* channel, const std::string& msg, Client* sender) {
+	if (channel == NULL || msg.empty()) {
+		return;
+	}
+	std::map<int, Client*> clients = channel->getClients();
+	for (std::map<int, Client*>::const_iterator it = clients.begin(); it != clients.end(); ++it) {
+		Client* client = it->second;
+		if (client != sender) {
+			_sendToClient(client, msg);
+		}
+	}
 }
