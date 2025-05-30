@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <asm-generic/socket.h>
 #include <cerrno>
+#include <csignal>
 #include <cstddef>
 #include <cstring>
 #include <map>
@@ -16,6 +17,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
+
+extern volatile sig_atomic_t g_terminate; //NOLINT
 
 Server::Server(const std::string& port) : _port(port), _sockfdIpv4(-1), _sockfdIpv6(-1), _res(NULL) {
 
@@ -52,20 +55,24 @@ Server::Server(const std::string& port) : _port(port), _sockfdIpv4(-1), _sockfdI
 Server::~Server() {_cleanup();}
 
 void Server::_cleanup() {
-	if (_res != 0) {
-		freeaddrinfo(_res); //free the linked list, from netdb.h
-		_res = NULL;
-	}
+	std::cout << "Cleaning up server resources...\n";
 	if (_sockfdIpv4 != -1) {
+		std::cout << "Closing IPv4 socket: " << _sockfdIpv4 << "\n";
 		close(_sockfdIpv4);
 		_sockfdIpv4 = -1;
 	}
 	if (_sockfdIpv6 != -1) {
+		std::cout << "Closing IPv6 socket: " << _sockfdIpv6 << "\n";
 		close(_sockfdIpv6);
 		_sockfdIpv6 = -1;
 	}
+	if (_res != 0) {
+		freeaddrinfo(_res); //free the linked list, from netdb.h
+		_res = NULL;
+	}
 	std::map<int, Client*>::iterator it;
 	for (it = _clients.begin(); it != _clients.end(); ++it) {
+		close(it->first);
 		delete it->second;
 	}
 	_clients.clear();
@@ -106,16 +113,19 @@ void Server::run() {
 	_addPollFd(_sockfdIpv4, POLLIN);
 	_addPollFd(_sockfdIpv6, POLLIN);
 
-	while (true) {
+	while (g_terminate == 0) {
 		const int n_poll = poll(_pollFds.data(), _pollFds.size(), TIMEOUT);
 
 		if (n_poll == -1) {
-			std::cerr << "Poll error: " << strerror(errno) << "\n";
+			if (errno != EINTR)
+				std::cerr << "Poll error: " << strerror(errno) << "\n";
 			continue;
 		}
 
 		_handlePollEvents();
 	}
+	_cleanup();
+	std::cout << "Server shutting down...\n";
 }
 
 void Server::_handlePollEvents() {
