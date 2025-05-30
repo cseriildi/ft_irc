@@ -127,6 +127,7 @@ void Server::run() {
 				}
 			}
 			if ((_pollFds[i].revents & POLLOUT) != 0) {
+				std::cout << "Pollout event on fd: " << _pollFds[i].fd << "\n";
 				if (!_handleClientActivity(i)) {
 					--i;
 				}
@@ -169,32 +170,29 @@ bool Server::_handleClientActivity(size_t index) {
 	if (client == 0)
 		return true;
 
-	try {
-		if ((_pollFds[index].revents & POLLIN) != 0) {
-			try {
-				client->receive();
-			} catch (const std::runtime_error& e) {
-				std::cerr << "Receive error on fd " << client_fd << ": " << e.what() << "\n";
-				_removeClient(index, client_fd);
-				return false;
+	if ((_pollFds[index].revents & POLLIN) != 0) {
+		try {
+			client->receive();
+			if (client->wantsToWrite()) {
+				_pollFds[index].events |= POLLOUT;
 			}
+		} catch (const std::runtime_error& e) {
+			std::cerr << "Receive error on fd " << client_fd << ": " << e.what() << "\n";
+			_removeClient(index, client_fd);
+			return false;
 		}
-		if ((_pollFds[index].revents & POLLOUT) != 0) {
-			try {
-				client->answer();
-			} catch (const std::runtime_error& e) {
-				std::cerr << "Send error on fd " << client_fd << ": " << e.what() << "\n";
-				_removeClient(index, client_fd);
-				return false;
-			}
-			if (!client->wantsToWrite()) {
-				_pollFds[index].events &= ~POLLOUT;
-			}
+	}
+	if ((_pollFds[index].revents & POLLOUT) != 0) {
+		try {
+			client->answer();
+		} catch (const std::runtime_error& e) {
+			std::cerr << "Send error on fd " << client_fd << ": " << e.what() << "\n";
+			_removeClient(index, client_fd);
+			return false;
 		}
-	} catch (const std::exception& e) {
-		std::cerr << "Client error on fd " << client_fd << ": " << e.what() << "\n";
-		_removeClient(index, client_fd);
-		return false;
+		if (!client->wantsToWrite()) {
+			_pollFds[index].events &= ~POLLOUT;
+		}
 	}
 	return true;
 }

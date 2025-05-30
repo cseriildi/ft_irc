@@ -37,9 +37,16 @@ void Client::receive() {
 		throw std::runtime_error("Error receiving data: " + std::string(strerror(errno)));
 	}
 	_inBuffer.append(buffer, received);
-	std::string response = mockIRC(_inBuffer);
-	if (!response.empty()) {
-		_outBuffer += response;
+
+	size_t pos;
+	while ((pos = _inBuffer.find("\r\n")) != std::string::npos) {
+		std::string line = _inBuffer.substr(0, pos + 2);
+		std::string response = mockIRC(line);
+		std::cout << "Received: " << line << "response: " << response << std::endl;
+		if (!response.empty()) {
+			_outBuffer += response;
+		}
+		_inBuffer.erase(0, pos + 2);
 	}
 }
 
@@ -64,6 +71,7 @@ void Client::handle() {
 }
 
 void Client::answer() {
+	std::cout << "Answering client: " << _outBuffer << std::endl;
 	while (!_outBuffer.empty()) {
 		const ssize_t sent = send(_clientFd, _outBuffer.c_str(), _outBuffer.length(), 0); //NOLINT
 		if (sent == -1) {
