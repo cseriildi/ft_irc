@@ -145,7 +145,7 @@ void Server::_handleNewConnection() {
 	}
 
 	std::cout << "New client connected: " << client_fd << "\n";
-	_clients[client_fd] = new Client(client_fd);
+	_clients[client_fd] = new Client(client_fd, this);
 	_addPollFd(client_fd, POLLIN);
 }
 
