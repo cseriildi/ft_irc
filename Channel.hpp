@@ -12,7 +12,9 @@ class Channel {
 
 		Channel(const std::string &name, Server *server);
 		~Channel();
-		
+
+		std::map<int, Client*> getClients() const;
+
 		Message join(int clientFd, const std::string &pass="");
 		Message part(int clientFd);
 		Message kick(int clientFd, const std::string &nick, const std::string &reason="");
@@ -20,9 +22,9 @@ class Channel {
 		Message topic(int clientFd, const std::string &topic="");
 		Message mode(int clientFd, const std::string &modes);
 		Message privmsg(int clientFd, const std::string &msg);
-	
+
 	private:
-	
+
 		Channel();
 		Channel(const Channel &other);
 		Channel &operator=(const Channel &other);
