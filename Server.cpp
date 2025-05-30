@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "Client.hpp"
 #include <arpa/inet.h>
 #include <asm-generic/socket.h>
 #include <cerrno>
@@ -15,28 +16,28 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-Server::Server(const std::string& port) : _port(port), _sockfd_ipv4(-1), _sockfd_ipv6(-1), _res(NULL) {
-
+Server::Server(const std::string& port) : _port(port), _sockfdIpv4(-1), _sockfdIpv6(-1), _res(NULL) {
+	
 	struct addrinfo hints = {}; //create hints struct for getaddrinfo
 	std::memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC; //AF_INET for IPv4 only, AF_INET6 for IPv6, AF_UNSPEC for both
 	hints.ai_socktype = SOCK_STREAM; //TCP
 	hints.ai_flags = AI_PASSIVE; //localhost address
-
+	
 	//Create a linked list of adresses available fon the port
 	const int status = getaddrinfo(NULL, _port.c_str(), &hints, &_res);
 	if (status != 0) {
 		//gai_strerror: getadressinfo to error string
 		throw std::runtime_error("getaddrinfo error: " + std::string(gai_strerror(status)));
 	}
-
+	
 	for (struct addrinfo* p = _res; p != NULL; p = p->ai_next) {
 		try {
 			if (p->ai_family == AF_INET) {
-				_sockfd_ipv4 = _bind_and_listen(p);
+				_sockfdIpv4 = _bindAndListen(p);
 				std::cout << "Server is listening on port " << _port << " (IPv4)\n";
 			} else if (p->ai_family == AF_INET6) {
-				_sockfd_ipv6 = _bind_and_listen(p);
+				_sockfdIpv6 = _bindAndListen(p);
 				std::cout << "Server is listening on port " << _port << " (IPv6)\n";
 			}
 		} catch (const std::runtime_error& e) {
@@ -47,18 +48,16 @@ Server::Server(const std::string& port) : _port(port), _sockfd_ipv4(-1), _sockfd
 	}
 }
 
-Server::~Server() {
-	_cleanup();
-}
+Server::~Server() {_cleanup();}
 
 void Server::_cleanup() {
 	if (_res != 0) {
 		freeaddrinfo(_res); //free the linked list, from netdb.h
 		_res = NULL;
 	}
-	if (_sockfd_ipv4 != -1) {
-		close(_sockfd_ipv4);
-		_sockfd_ipv4 = -1;
+	if (_sockfdIpv4 != -1) {
+		close(_sockfdIpv4);
+		_sockfdIpv4 = -1;
 	}
 	std::map<int, Client*>::iterator it;
 	for (it = _clients.begin(); it != _clients.end(); ++it) {
@@ -67,7 +66,7 @@ void Server::_cleanup() {
 	_clients.clear();
 }
 
-int Server::_bind_and_listen(const struct addrinfo* res) {
+int Server::_bindAndListen(const struct addrinfo* res) {
 	//Create a socket we can bind to, uses the nodes from getaddrinfo
 	const int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (sockfd == -1) {
@@ -99,22 +98,22 @@ int Server::_bind_and_listen(const struct addrinfo* res) {
 
 void Server::run() {
 	// add server socket to pollfds
-	_addPollFd(_sockfd_ipv4, POLLIN);
-	_addPollFd(_sockfd_ipv6, POLLIN);
+	_addPollFd(_sockfdIpv4, POLLIN);
+	_addPollFd(_sockfdIpv6, POLLIN);
 
 	while (true) {
-		const int n_poll = poll(_pollfds.data(), _pollfds.size(), TIMEOUT);
+		const int n_poll = poll(_pollFds.data(), _pollFds.size(), TIMEOUT);
 
 		if (n_poll == -1) {
 			std::cerr << "Poll error: " << strerror(errno) << "\n";
 			continue;
 		}
 
-		for (size_t i = 0; i < _pollfds.size(); ++i) {
+		for (size_t i = 0; i < _pollFds.size(); ++i) {
 			// If the returned events POLLIN bit is set, there is data to read
-			if ((_pollfds[i].revents & POLLIN) != 0) {
+			if ((_pollFds[i].revents & POLLIN) != 0) {
 				// if the socket is still the server socket, it has not been accept()-ed yet
-				if (_pollfds[i].fd == _sockfd_ipv4) {
+				if (_pollFds[i].fd == _sockfdIpv4) {
 					_handleNewConnection();
 				} else {
 					if (!_handleClientActivity(i)) {
@@ -131,14 +130,14 @@ void Server::_addPollFd(int fd, short events) {
 	pfd.fd = fd;
 	pfd.events = events;
 	pfd.revents = 0; //return events, to be filled by poll
-	_pollfds.push_back(pfd);
+	_pollFds.push_back(pfd);
 }
 
 void Server::_handleNewConnection() {
 	struct sockaddr_storage client_addr = {};
 	socklen_t addrLen = sizeof(client_addr);
 	// should not block now, since poll tells us there is a connection pending
-	int const client_fd = accept(_sockfd_ipv4, (struct sockaddr*)&client_addr, &addrLen); //NOLINT
+	int const client_fd = accept(_sockfdIpv4, (struct sockaddr*)&client_addr, &addrLen); //NOLINT
 
 	if (client_fd == -1) {
 		std::cerr << "Accept error: " << strerror(errno) << "\n";
@@ -146,12 +145,12 @@ void Server::_handleNewConnection() {
 	}
 
 	std::cout << "New client connected: " << client_fd << "\n";
-	_clients[client_fd] = new Client(client_fd);
+	_clients[client_fd] = new Client(client_fd, this);
 	_addPollFd(client_fd, POLLIN);
 }
 
 bool Server::_handleClientActivity(size_t index) {
-	int const client_fd = _pollfds[index].fd;
+	int const client_fd = _pollFds[index].fd;
 	Client* client = _clients[client_fd];
 
 	if (client == 0)
@@ -171,5 +170,5 @@ void Server::_removeClient(size_t index, int fd) {
 	close(fd); // Close the file descriptor to prevent leaks
 	delete _clients[fd];
 	_clients.erase(fd);
-	_pollfds.erase(_pollfds.begin() + index); //NOLINT
+	_pollFds.erase(_pollFds.begin() + index); //NOLINT
 }

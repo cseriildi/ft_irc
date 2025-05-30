@@ -1,26 +1,48 @@
-#ifndef CLIENT_HPP
-#define CLIENT_HPP
+#pragma once
 
+#include "Message.hpp"
 #include <string>
 #include <arpa/inet.h> // for send, recv
 
 #define BUFFER_SIZE 512 // standard message size for IRC
 
+class Server;
+
 class Client {
-private:
-	int _sockfd_ipv4;
-	//Instance of IRC interpeter, called with a string, returns a string
+	public:
 
-	Client();
-	Client(const Client &other);
-	Client &operator=(const Client &other);
+		Client(int sockfd, Server *server);
+		~Client();
 
-	bool _sendAll(const std::string &message) const;
-public:
-	Client(int sockfd);
-	~Client();
+		void		handle();
+		std::string	receive() const;
 
-	void handle();
+		Message nick(const std::string &msg);
+		Message user(const std::string &msg);
+		Message pass(const std::string &msg);
+		Message who(const std::string &msg);
+		Message privmsg(const std::string &msg);
+		Message ping(const std::string &msg);
+
+		// Channel commands
+		Message join(const std::string &msg);
+		Message part(const std::string &msg);
+		Message kick(const std::string &msg);
+		Message invite(const std::string &msg);
+		Message topic(const std::string &msg);
+		Message mode(const std::string &msg);
+		Message list(const std::string &msg);
+		Message names(const std::string &msg);
+
+	private:
+
+		//Instance of IRC interpeter, called with a string, returns a string
+		Client();
+		Client(const Client &other);
+		Client &operator=(const Client &other);
+		
+		bool	_sendAll(const std::string &message) const;
+
+		int		_clientFd;
+		Server*	_server;
 };
-
-#endif

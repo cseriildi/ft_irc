@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-Client::Client(int sockfd) : _sockfd_ipv4(sockfd) {}
+Client::Client(int sockfd, Server* server) : _clientFd(sockfd),  _server(server) {}
 
 Client::~Client() {}
 
@@ -25,11 +25,11 @@ std::string mockIRC(const std::string& input) {
 }
 // NOLINTEND
 
-void Client::handle() {
+std::string Client::receive() const {
 	char buffer[BUFFER_SIZE];
 	memset(buffer, 0, sizeof(buffer)); //NOLINT
 
-	const ssize_t received = recv(_sockfd_ipv4, buffer, sizeof(buffer) - 1, 0); //NOLINT
+	const ssize_t received = recv(_clientFd, buffer, sizeof(buffer) - 1, 0); //NOLINT
 	if (received == 0) {
 		throw std::runtime_error("Client disconnected");
 	}
@@ -40,6 +40,27 @@ void Client::handle() {
 	const std::string msg(buffer, received); //NOLINT
 
 	std::cout << "Received: " << msg;
+	return msg;
+}
+
+void Client::handle() {
+	const std::string msg = receive();
+
+	
+	//TODO: PASS
+	//TODO: NICK
+	//TODO: WHO
+	//TODO: USER
+	//TODO: JOIN
+	//TODO: PRIVMSG
+	//TODO: PING
+	//TODO: MODE
+	//TODO: TOPIC
+	//TODO: KICK
+	//TODO: INVITE
+	//TODO: PART
+
+	//TODO: broadcast if in channel
 
 	const std::string response = mockIRC(msg);
 
@@ -57,7 +78,7 @@ bool Client::_sendAll(const std::string &message) const {
 	while (sent_len < msg_len) {
 		// send might not send all bytes at once, so we loop until all bytes are sent
 		// returns the number of bytes sent, or -1 on error
-		const ssize_t sent = send(_sockfd_ipv4, message.c_str() + sent_len, msg_len - sent_len, 0); //NOLINT
+		const ssize_t sent = send(_clientFd, message.c_str() + sent_len, msg_len - sent_len, 0); //NOLINT
 		if (sent == -1) {
 			std::cerr << "Error sending message: " << strerror(errno) << "\n";
 			return false;

@@ -7,6 +7,10 @@ This project consists of building a simplified IRC *(Internet Relay Chat)* serve
 
 - **Allowed external functions**: `socket`, `close`, `setsockopt`, `getsockname`, `getprotobyname`, `gethostbyname`, `getaddrinfo`, `freeaddrinfo`, `bind`, `connect`, `listen`, `accept`, `htons`, `htonl`, `ntohs`, `ntohl`, `inet_addr`, `inet_ntoa`, `send`, `recv`, `signal`, `sigaction`, `lseek`, `fstat`, `fcntl`, `poll` *(or equivalent)*
 
+## Useful things
+- [Internet Relay Chat: Client Protocol](https://www.rfc-editor.org/rfc/rfc2812.html)
+- [Guide to Network Programming](https://beej.us/guide/bgnet/pdf/bgnet_a4_c_1.pdf)
+
 ## Mandatory Part
 
 ## Bonus Part
