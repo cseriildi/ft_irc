@@ -5,7 +5,6 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstring>
-#include <exception>
 #include <map>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -114,23 +113,27 @@ void Server::run() {
 			continue;
 		}
 
-		for (size_t i = 0; i < _pollFds.size(); ++i) {
-			// If the returned events POLLIN bit is set, there is data to read
-			if ((_pollFds[i].revents & POLLIN) != 0) {
-				// if the socket is still the server socket, it has not been accept()-ed yet
-				if (_pollFds[i].fd == _sockfdIpv4 || _pollFds[i].fd == _sockfdIpv6) {
-					_handleNewConnection(_pollFds[i].fd);
-				} else {
-					if (!_handleClientActivity(i)) {
-						--i;
-					}
-				}
-			}
-			if ((_pollFds[i].revents & POLLOUT) != 0) {
-				std::cout << "Pollout event on fd: " << _pollFds[i].fd << "\n";
+		_handlePollEvents();
+	}
+}
+
+void Server::_handlePollEvents() {
+	for (size_t i = 0; i < _pollFds.size(); ++i) {
+		// If the returned events POLLIN bit is set, there is data to read
+		if ((_pollFds[i].revents & POLLIN) != 0) {
+			// if the socket is still the server socket, it has not been accept()-ed yet
+			if (_pollFds[i].fd == _sockfdIpv4 || _pollFds[i].fd == _sockfdIpv6) {
+				_handleNewConnection(_pollFds[i].fd);
+			} else {
 				if (!_handleClientActivity(i)) {
 					--i;
 				}
+			}
+		}
+		if ((_pollFds[i].revents & POLLOUT) != 0) {
+			std::cout << "Pollout event on fd: " << _pollFds[i].fd << "\n";
+			if (!_handleClientActivity(i)) {
+				--i;
 			}
 		}
 	}

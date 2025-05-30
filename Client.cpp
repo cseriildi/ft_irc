@@ -36,13 +36,13 @@ void Client::receive() {
 	if (received == -1) {
 		throw std::runtime_error("Error receiving data: " + std::string(strerror(errno)));
 	}
-	_inBuffer.append(buffer, received);
+	_inBuffer.append(buffer, received); //NOLINT
 
-	size_t pos;
+	size_t pos = 0;
 	while ((pos = _inBuffer.find("\r\n")) != std::string::npos) {
-		std::string line = _inBuffer.substr(0, pos + 2);
-		std::string response = mockIRC(line);
-		std::cout << "Received: " << line << "response: " << response << std::endl;
+		std::string const line = _inBuffer.substr(0, pos + 2);
+		std::string const response = mockIRC(line);
+		std::cout << "Received: " << line << "response: " << response << '\n';
 		if (!response.empty()) {
 			_outBuffer += response;
 		}
@@ -71,7 +71,7 @@ void Client::handle() {
 }
 
 void Client::answer() {
-	std::cout << "Answering client: " << _outBuffer << std::endl;
+	std::cout << "Answering client: " << _outBuffer << '\n';
 	while (!_outBuffer.empty()) {
 		const ssize_t sent = send(_clientFd, _outBuffer.c_str(), _outBuffer.length(), 0); //NOLINT
 		if (sent == -1) {
