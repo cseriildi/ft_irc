@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "Channel.hpp"
 #include "Client.hpp"
 #include <arpa/inet.h>
 #include <asm-generic/socket.h>
@@ -168,9 +169,6 @@ void Server::_handleNewConnection(int sockfd) {
 		return;
 	}
 
-	// Set the client socket to non-blocking mode
-	fcntl(client_fd, F_SETFL, O_NONBLOCK); //NOLINT
-
 	std::cout << "New client connected: " << client_fd << "\n";
 	_clients[client_fd] = new Client(client_fd, this);
 	_addPollFd(client_fd, POLLIN);
@@ -186,9 +184,6 @@ bool Server::_handleClientActivity(size_t index) {
 	if ((_pollFds[index].revents & POLLIN) != 0) {
 		try {
 			client->receive();
-			if (client->wantsToWrite()) {
-				_pollFds[index].events |= POLLOUT;
-			}
 		} catch (const std::runtime_error& e) {
 			std::cerr << "Receive error on fd " << client_fd << ": " << e.what() << "\n";
 			_removeClient(index, client_fd);
@@ -215,4 +210,30 @@ void Server::_removeClient(size_t index, int fd) {
 	delete _clients[fd];
 	_clients.erase(fd);
 	_pollFds.erase(_pollFds.begin() + index); //NOLINT
+}
+
+void Server::sendToClient(Client* client, const std::string& msg) {
+	if (client == NULL || msg.empty()) {
+		return;
+	}
+	client->appendToOutBuffer(msg);
+	for (size_t i = 0; i < _pollFds.size(); ++i) {
+		if (_pollFds[i].fd == client->getFd()) {
+			_pollFds[i].events |= POLLOUT;
+			break;
+		}
+	}
+}
+
+void Server::_sendToChannel(Channel* channel, const std::string& msg, Client* sender) {
+	if (channel == NULL || msg.empty()) {
+		return;
+	}
+	std::map<int, Client*> clients = channel->getClients();
+	for (std::map<int, Client*>::const_iterator it = clients.begin(); it != clients.end(); ++it) {
+		Client* client = it->second;
+		if (client != sender) {
+			sendToClient(client, msg);
+		}
+	}
 }

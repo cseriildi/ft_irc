@@ -18,6 +18,8 @@ class Client {
 		void		receive();
 		void		answer();
 		bool		wantsToWrite() const;
+		void		appendToOutBuffer(const std::string &msg);
+		int			getFd() const;
 
 		Message nick(const std::string &msg);
 		Message user(const std::string &msg);
