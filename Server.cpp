@@ -5,7 +5,6 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstring>
-#include <exception>
 #include <map>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -15,22 +14,23 @@
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 Server::Server(const std::string& port) : _port(port), _sockfdIpv4(-1), _sockfdIpv6(-1), _res(NULL) {
-	
+
 	struct addrinfo hints = {}; //create hints struct for getaddrinfo
 	std::memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC; //AF_INET for IPv4 only, AF_INET6 for IPv6, AF_UNSPEC for both
 	hints.ai_socktype = SOCK_STREAM; //TCP
 	hints.ai_flags = AI_PASSIVE; //localhost address
-	
+
 	//Create a linked list of adresses available fon the port
 	const int status = getaddrinfo(NULL, _port.c_str(), &hints, &_res);
 	if (status != 0) {
 		//gai_strerror: getadressinfo to error string
 		throw std::runtime_error("getaddrinfo error: " + std::string(gai_strerror(status)));
 	}
-	
+
 	for (struct addrinfo* p = _res; p != NULL; p = p->ai_next) {
 		try {
 			if (p->ai_family == AF_INET) {
@@ -58,6 +58,10 @@ void Server::_cleanup() {
 	if (_sockfdIpv4 != -1) {
 		close(_sockfdIpv4);
 		_sockfdIpv4 = -1;
+	}
+	if (_sockfdIpv6 != -1) {
+		close(_sockfdIpv6);
+		_sockfdIpv6 = -1;
 	}
 	std::map<int, Client*>::iterator it;
 	for (it = _clients.begin(); it != _clients.end(); ++it) {
@@ -109,17 +113,27 @@ void Server::run() {
 			continue;
 		}
 
-		for (size_t i = 0; i < _pollFds.size(); ++i) {
-			// If the returned events POLLIN bit is set, there is data to read
-			if ((_pollFds[i].revents & POLLIN) != 0) {
-				// if the socket is still the server socket, it has not been accept()-ed yet
-				if (_pollFds[i].fd == _sockfdIpv4) {
-					_handleNewConnection();
-				} else {
-					if (!_handleClientActivity(i)) {
-						--i;
-					}
+		_handlePollEvents();
+	}
+}
+
+void Server::_handlePollEvents() {
+	for (size_t i = 0; i < _pollFds.size(); ++i) {
+		// If the returned events POLLIN bit is set, there is data to read
+		if ((_pollFds[i].revents & POLLIN) != 0) {
+			// if the socket is still the server socket, it has not been accept()-ed yet
+			if (_pollFds[i].fd == _sockfdIpv4 || _pollFds[i].fd == _sockfdIpv6) {
+				_handleNewConnection(_pollFds[i].fd);
+			} else {
+				if (!_handleClientActivity(i)) {
+					--i;
 				}
+			}
+		}
+		if ((_pollFds[i].revents & POLLOUT) != 0) {
+			std::cout << "Pollout event on fd: " << _pollFds[i].fd << "\n";
+			if (!_handleClientActivity(i)) {
+				--i;
 			}
 		}
 	}
@@ -133,16 +147,19 @@ void Server::_addPollFd(int fd, short events) {
 	_pollFds.push_back(pfd);
 }
 
-void Server::_handleNewConnection() {
+void Server::_handleNewConnection(int sockfd) {
 	struct sockaddr_storage client_addr = {};
 	socklen_t addrLen = sizeof(client_addr);
 	// should not block now, since poll tells us there is a connection pending
-	int const client_fd = accept(_sockfdIpv4, (struct sockaddr*)&client_addr, &addrLen); //NOLINT
+	int const client_fd = accept(sockfd, (struct sockaddr*)&client_addr, &addrLen); //NOLINT
 
 	if (client_fd == -1) {
 		std::cerr << "Accept error: " << strerror(errno) << "\n";
 		return;
 	}
+
+	// Set the client socket to non-blocking mode
+	fcntl(client_fd, F_SETFL, O_NONBLOCK); //NOLINT
 
 	std::cout << "New client connected: " << client_fd << "\n";
 	_clients[client_fd] = new Client(client_fd, this);
@@ -156,12 +173,29 @@ bool Server::_handleClientActivity(size_t index) {
 	if (client == 0)
 		return true;
 
-	try {
-		client->handle();
-	} catch (const std::exception& e) {
-		std::cerr << "Client error on fd " << client_fd << ": " << e.what() << "\n";
-		_removeClient(index, client_fd);
-		return false;
+	if ((_pollFds[index].revents & POLLIN) != 0) {
+		try {
+			client->receive();
+			if (client->wantsToWrite()) {
+				_pollFds[index].events |= POLLOUT;
+			}
+		} catch (const std::runtime_error& e) {
+			std::cerr << "Receive error on fd " << client_fd << ": " << e.what() << "\n";
+			_removeClient(index, client_fd);
+			return false;
+		}
+	}
+	if ((_pollFds[index].revents & POLLOUT) != 0) {
+		try {
+			client->answer();
+		} catch (const std::runtime_error& e) {
+			std::cerr << "Send error on fd " << client_fd << ": " << e.what() << "\n";
+			_removeClient(index, client_fd);
+			return false;
+		}
+		if (!client->wantsToWrite()) {
+			_pollFds[index].events &= ~POLLOUT;
+		}
 	}
 	return true;
 }

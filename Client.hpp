@@ -15,7 +15,9 @@ class Client {
 		~Client();
 
 		void		handle();
-		std::string	receive() const;
+		void		receive();
+		void		answer();
+		bool		wantsToWrite() const;
 
 		Message nick(const std::string &msg);
 		Message user(const std::string &msg);
@@ -40,9 +42,9 @@ class Client {
 		Client();
 		Client(const Client &other);
 		Client &operator=(const Client &other);
-		
-		bool	_sendAll(const std::string &message) const;
 
-		int		_clientFd;
-		Server*	_server;
+		int			_clientFd;
+		Server*		_server;
+		std::string	_inBuffer;
+		std::string	_outBuffer;
 };

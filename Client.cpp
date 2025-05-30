@@ -25,7 +25,7 @@ std::string mockIRC(const std::string& input) {
 }
 // NOLINTEND
 
-std::string Client::receive() const {
+void Client::receive() {
 	char buffer[BUFFER_SIZE];
 	memset(buffer, 0, sizeof(buffer)); //NOLINT
 
@@ -36,17 +36,22 @@ std::string Client::receive() const {
 	if (received == -1) {
 		throw std::runtime_error("Error receiving data: " + std::string(strerror(errno)));
 	}
+	_inBuffer.append(buffer, received); //NOLINT
 
-	const std::string msg(buffer, received); //NOLINT
-
-	std::cout << "Received: " << msg;
-	return msg;
+	size_t pos = 0;
+	while ((pos = _inBuffer.find("\r\n")) != std::string::npos) {
+		std::string const line = _inBuffer.substr(0, pos + 2);
+		std::string const response = mockIRC(line);
+		std::cout << "Received: " << line << "response: " << response << '\n';
+		if (!response.empty()) {
+			_outBuffer += response;
+		}
+		_inBuffer.erase(0, pos + 2);
+	}
 }
 
 void Client::handle() {
-	const std::string msg = receive();
 
-	
 	//TODO: PASS
 	//TODO: NICK
 	//TODO: WHO
@@ -62,29 +67,20 @@ void Client::handle() {
 
 	//TODO: broadcast if in channel
 
-	const std::string response = mockIRC(msg);
 
-	if (!response.empty()) {
-		if (!_sendAll(response)) {
-			throw std::runtime_error("Error sending response: " + std::string(strerror(errno)));
+}
+
+void Client::answer() {
+	std::cout << "Answering client: " << _outBuffer << '\n';
+	while (!_outBuffer.empty()) {
+		const ssize_t sent = send(_clientFd, _outBuffer.c_str(), _outBuffer.length(), 0); //NOLINT
+		if (sent == -1) {
+			throw std::runtime_error("Error sending data: " + std::string(strerror(errno)));
 		}
+		_outBuffer.erase(0, sent);
 	}
 }
 
-bool Client::_sendAll(const std::string &message) const {
-	size_t sent_len = 0;
-	const size_t msg_len = message.length();
-
-	while (sent_len < msg_len) {
-		// send might not send all bytes at once, so we loop until all bytes are sent
-		// returns the number of bytes sent, or -1 on error
-		const ssize_t sent = send(_clientFd, message.c_str() + sent_len, msg_len - sent_len, 0); //NOLINT
-		if (sent == -1) {
-			std::cerr << "Error sending message: " << strerror(errno) << "\n";
-			return false;
-		}
-		sent_len += sent;
-	}
-
-	return true;
+bool Client::wantsToWrite() const {
+	return !_outBuffer.empty();
 }
