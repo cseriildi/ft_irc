@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Channel.hpp"
 #include "Client.hpp"
 #include <cstddef>
 #include <string>
@@ -31,10 +32,11 @@ class Server {
 		bool		_handleClientActivity(size_t index);
 		void		_removeClient(size_t index, int cfd);
 
-		std::string					_port;
-		int							_sockfdIpv4;
-		int							_sockfdIpv6;
-		struct addrinfo				*_res;
-		std::vector<struct pollfd>	_pollFds; // vector of the fds we are polling
-		std::map<int, Client*>		_clients; // with client_fd as key
+		std::string						_port;
+		int								_sockfdIpv4;
+		int								_sockfdIpv6;
+		struct addrinfo*				_res;
+		std::vector<struct pollfd>		_pollFds; // vector of the fds we are polling
+		std::map<int, Client*>			_clients; // with client_fd as key
+		std::map<std::string, Channel*>	_channels; // with channel name as key
 };
