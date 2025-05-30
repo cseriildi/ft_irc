@@ -125,7 +125,6 @@ void Server::run() {
 		_handlePollEvents();
 	}
 	_cleanup();
-	std::cout << "Server shutting down...\n";
 }
 
 void Server::_handlePollEvents() {
@@ -142,7 +141,6 @@ void Server::_handlePollEvents() {
 			}
 		}
 		if ((_pollFds[i].revents & POLLOUT) != 0) {
-			std::cout << "Pollout event on fd: " << _pollFds[i].fd << "\n";
 			if (!_handleClientActivity(i)) {
 				--i;
 			}
@@ -181,6 +179,11 @@ bool Server::_handleClientActivity(size_t index) {
 	if (client == 0)
 		return true;
 
+	if ((_pollFds[index].revents & (POLLHUP | POLLERR)) != 0) {
+		std::cerr << "Client fd " << client_fd << " hangup or error\n";
+		_removeClient(index, client_fd);
+		return false;
+	}
 	if ((_pollFds[index].revents & POLLIN) != 0) {
 		try {
 			client->receive();
