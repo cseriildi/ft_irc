@@ -19,7 +19,7 @@ int main(int argc, char **argv) try {
 
 	signal(SIGINT, handle_signal); //NOLINT
 	signal(SIGQUIT, handle_signal); //NOLINT
-	Server server(argv[1]); //NOLINT
+	Server server(argv[1], argv[2]); //NOLINT
 	server.run();
 
 	return 0;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Channel.hpp"
-#include "Client.hpp"
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -11,14 +10,33 @@
 #define MAX_CLIENTS 100
 #define TIMEOUT 5000 // poll will block for this long unless an event occurs
 
+class Client;
 class Server {
 	public:
 
-		Server(const std::string &port);
+		enum ERR {
+			ERR_UNKNOWNCOMMAND = 421,
+			ERR_NONICKNAMEGIVEN = 431,
+			ERR_ERRONEUSNICKNAME = 432,
+			ERR_NICKNAMEINUSE = 433,
+			ERR_NOTREGISTERED = 451,
+			ERR_NEEDMOREPARAMS = 461,
+			ERR_ALREADYREGISTRED = 462
+
+		};
+
+		static const std::map<ERR, std::string> ERRORS; 
+
+		Server(const std::string &port, const std::string &password="");
 		~Server();
 
 		void	run();
 		void	sendToClient(Client *client, const std::string &msg);
+
+		static std::map<Server::ERR, std::string> init_error_map();
+
+		bool	authenticate(Client *user);
+		bool	isNicknameAvailable(Client *user) const;
 
 	private:
 
@@ -42,4 +60,7 @@ class Server {
 		std::vector<struct pollfd>		_pollFds; // vector of the fds we are polling
 		std::map<int, Client*>			_clients; // with client_fd as key
 		std::map<std::string, Channel*>	_channels; // with channel name as key
+		std::string						_name;
+		bool							_isPassRequired;
+		std::string						_password;
 };

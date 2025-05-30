@@ -1,6 +1,7 @@
 #include "Server.hpp"
 #include "Channel.hpp"
 #include "Client.hpp"
+#include "utils.hpp"
 #include <arpa/inet.h>
 #include <asm-generic/socket.h>
 #include <cerrno>
@@ -20,8 +21,24 @@
 
 extern volatile sig_atomic_t g_terminate; //NOLINT
 
-Server::Server(const std::string& port) : _port(port), _sockfdIpv4(-1), _sockfdIpv6(-1), _res(NULL) {
+const std::map<Server::ERR, std::string> Server::ERRORS = init_error_map();
 
+std::map<Server::ERR, std::string> Server::init_error_map() {
+	std::map<ERR, std::string> errorMap;
+	errorMap[ERR_UNKNOWNCOMMAND] = "Unknown command";
+	errorMap[ERR_NONICKNAMEGIVEN] = "No nickname given";
+	errorMap[ERR_ERRONEUSNICKNAME] = "Erroneous nickname";
+	errorMap[ERR_NICKNAMEINUSE] = "Nickname is already in use";
+	errorMap[ERR_NOTREGISTERED] = "You have not registered";
+	errorMap[ERR_NEEDMOREPARAMS] = "Not enough parameters";
+	errorMap[ERR_ALREADYREGISTRED] = "You may not reregister";
+	//TODO: Add more error codes as needed
+	return errorMap;
+}
+
+Server::Server(const std::string& port, const std::string& pass) : _port(port), _sockfdIpv4(-1), _sockfdIpv6(-1), _res(NULL), _password(pass) {
+
+	_isPassRequired = !_password.empty(); //TODO: think about it
 	struct addrinfo hints = {}; //create hints struct for getaddrinfo
 	std::memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC; //AF_INET for IPv4 only, AF_INET6 for IPv6, AF_UNSPEC for both
@@ -239,4 +256,21 @@ void Server::_sendToChannel(Channel* channel, const std::string& msg, Client* se
 			sendToClient(client, msg);
 		}
 	}
+}
+
+bool	Server::authenticate(Client *user) {
+	if (user == NULL || (_isPassRequired && user->getPassword() != _password))
+		return false;
+	_clients[user->getClientFd()] = user;
+	return true;
+}
+
+bool	Server::isNicknameAvailable(Client *user) const {
+	for (std::map<int, Client*>::const_iterator it = _clients.begin(); it != _clients.end(); ++it) {
+		if (it->first != user->getClientFd() &&
+			uppercase(it->second->getNick()) == uppercase(user->getNick())) {
+			return false;
+		}
+	}
+	return true;
 }

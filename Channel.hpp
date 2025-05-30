@@ -1,11 +1,10 @@
 #pragma once
 
-#include "Client.hpp"
-#include "Message.hpp"
 #include <map>
 #include <string>
 
 class Server;
+class Client;
 
 class Channel {
 	public:
@@ -15,13 +14,13 @@ class Channel {
 
 		std::map<int, Client*> getClients() const;
 
-		Message join(int clientFd, const std::string &pass="");
-		Message part(int clientFd);
-		Message kick(int clientFd, const std::string &nick, const std::string &reason="");
-		Message invite(int clientFd, const std::string &nick);
-		Message topic(int clientFd, const std::string &topic="");
-		Message mode(int clientFd, const std::string &modes);
-		Message privmsg(int clientFd, const std::string &msg);
+		std::string join(int clientFd, const std::string &pass="");
+		std::string part(int clientFd);
+		std::string kick(int clientFd, const std::string &nick, const std::string &reason="");
+		std::string invite(int clientFd, const std::string &nick);
+		std::string topic(int clientFd, const std::string &topic="");
+		std::string mode(int clientFd, const std::string &modes);
+		std::string privmsg(int clientFd, const std::string &msg);
 
 	private:
 
