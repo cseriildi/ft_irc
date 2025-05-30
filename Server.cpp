@@ -15,6 +15,7 @@
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 Server::Server(const std::string& port) : _port(port), _sockfdIpv4(-1), _sockfdIpv6(-1), _res(NULL) {
 
@@ -125,6 +126,11 @@ void Server::run() {
 					}
 				}
 			}
+			if ((_pollFds[i].revents & POLLOUT) != 0) {
+				if (!_handleClientActivity(i)) {
+					--i;
+				}
+			}
 		}
 	}
 }
@@ -148,6 +154,9 @@ void Server::_handleNewConnection(int sockfd) {
 		return;
 	}
 
+	// Set the client socket to non-blocking mode
+	fcntl(client_fd, F_SETFL, O_NONBLOCK); //NOLINT
+
 	std::cout << "New client connected: " << client_fd << "\n";
 	_clients[client_fd] = new Client(client_fd, this);
 	_addPollFd(client_fd, POLLIN);
@@ -161,7 +170,27 @@ bool Server::_handleClientActivity(size_t index) {
 		return true;
 
 	try {
-		client->handle();
+		if ((_pollFds[index].revents & POLLIN) != 0) {
+			try {
+				client->receive();
+			} catch (const std::runtime_error& e) {
+				std::cerr << "Receive error on fd " << client_fd << ": " << e.what() << "\n";
+				_removeClient(index, client_fd);
+				return false;
+			}
+		}
+		if ((_pollFds[index].revents & POLLOUT) != 0) {
+			try {
+				client->answer();
+			} catch (const std::runtime_error& e) {
+				std::cerr << "Send error on fd " << client_fd << ": " << e.what() << "\n";
+				_removeClient(index, client_fd);
+				return false;
+			}
+			if (!client->wantsToWrite()) {
+				_pollFds[index].events &= ~POLLOUT;
+			}
+		}
 	} catch (const std::exception& e) {
 		std::cerr << "Client error on fd " << client_fd << ": " << e.what() << "\n";
 		_removeClient(index, client_fd);
