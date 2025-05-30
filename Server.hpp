@@ -28,7 +28,7 @@ class Server {
 		void		_cleanup();
 		static int	_bindAndListen(const struct addrinfo *res);
 		void		_addPollFd(int fd, short events);
-		void		_handleNewConnection();
+		void		_handleNewConnection(int sockfd);
 		bool		_handleClientActivity(size_t index);
 		void		_removeClient(size_t index, int cfd);
 
