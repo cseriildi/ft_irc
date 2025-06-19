@@ -13,6 +13,7 @@
 class Channel;
 
 typedef void (Client::*CommandFunction)(const std::vector<std::string> &);
+typedef std::map<std::string, Channel *> ChannelList;
 
 class Client {
  public:
@@ -78,7 +79,9 @@ class Client {
   bool isUserSet() const;
   bool isAuthenticated() const;
   bool wantsToQuit() const;
-  const std::map<std::string, Channel *> &getChannels() const;
+  const ChannelList &getChannels() const;
+
+  static bool isValidName(const std::string &name);
 
  private:
   // Instance of IRC interpeter, called with a string, returns a string
@@ -106,6 +109,5 @@ class Client {
   Server *_server;
   std::string _inBuffer;
   std::string _outBuffer;
-  std::map<std::string, Channel *>
-      _channels;  // channels the client is in, with channel name as key
+  ChannelList _channels;
 };

@@ -118,7 +118,7 @@ void Server::_cleanup() {
     freeaddrinfo(_res);  // free the linked list, from netdb.h
     _res = NULL;
   }
-  std::map<int, Client *>::iterator it;
+  ClientList::iterator it;
   for (it = _clients.begin(); it != _clients.end(); ++it) {
     close(it->first);
     delete it->second;
@@ -266,7 +266,7 @@ bool Server::_handleClientActivity(size_t index) {
 
 void Server::removeClient(int fd) {
   close(fd);
-  std::map<int, Client *>::iterator const it = _clients.find(fd);
+  const ClientList::iterator it = _clients.find(fd);
   if (it != _clients.end()) {
     delete it->second;
     _clients.erase(it);
@@ -298,9 +298,9 @@ void Server::sendToChannel(Channel *channel, const std::string &msg,
   if (channel == NULL || msg.empty()) {
     return;
   }
-  std::map<int, Client *> clients = channel->getClients();
-  for (std::map<int, Client *>::const_iterator it = clients.begin();
-       it != clients.end(); ++it) {
+  ClientList clients = channel->getClients();
+  for (ClientList::const_iterator it = clients.begin(); it != clients.end();
+       ++it) {
     Client *client = it->second;
     if (client != sender) {
       sendToClient(client, msg);
@@ -309,7 +309,7 @@ void Server::sendToChannel(Channel *channel, const std::string &msg,
 }
 
 bool Server::isNicknameAvailable(Client *user) const {
-  Client *found = findClient(user->getNick());
+  Client *found = findClient(_clients, user->getClientFd());
   return found == NULL || found == user;
 }
 
@@ -320,16 +320,28 @@ bool Server::isPassRequired() const { return _isPassRequired; }
 const std::map<std::string, Channel *> &Server::getChannels() const {
   return _channels;
 }
-const std::map<int, Client *> &Server::getClients() const { return _clients; }
+const ClientList &Server::getClients() const { return _clients; }
 
-void Server::removeChannel(const std::string &name) { _channels.erase(name); }
-
-Client *Server::findClient(const std::string &nick) const {
-  for (std::map<int, Client *>::const_iterator it = _clients.begin();
-       it != _clients.end(); ++it) {
-    if (uppercase(it->second->getNick()) == uppercase(nick)) {
-      return it->second;
-    }
+void Server::addClient(Client *client) {
+  if (client == NULL) {
+    return;
   }
-  return NULL;
+  _clients[client->getFd()] = client;
+  _addPollFd(client->getFd(), POLLIN);
+}
+
+void Server::addChannel(Channel *channel) {
+  if (channel == NULL) {
+    return;
+  }
+  _channels[channel->getName()] = channel;
+}
+
+void Server::removeChannel(const std::string &name) {
+  Channel *channel = findChannel(_channels, name);
+  if (channel == NULL) {
+    return;
+  }
+  _channels.erase(name);
+  delete findChannel(_channels, name);
 }
