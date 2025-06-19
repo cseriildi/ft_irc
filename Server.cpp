@@ -342,6 +342,6 @@ void Server::removeChannel(const std::string &name) {
   if (channel == NULL) {
     return;
   }
+  delete channel;
   _channels.erase(name);
-  delete findChannel(_channels, name);
 }
