@@ -87,7 +87,7 @@ void Channel::addOperator(Client *client) {
 }
 
 void Channel::removeOperator(int clientFd) {
-  if (findClient(_clients, clientFd) != NULL) {
+  if (findClient(_operators, clientFd) != NULL) {
     _operators.erase(clientFd);
   }
   if (_operators.empty()) {
