@@ -46,7 +46,7 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
 
 Client::Client(int sockfd, Server *server)
     : _clientFd(sockfd), _mode(0), _isPassSet(false), _isNickSet(false),
-      _isUserSet(false), _isAuthenticated(false), _server(server) {}
+      _isUserSet(false), _isAuthenticated(false), _wantsToQuit(false), _server(server) {}
 
 Client::~Client() {}
 
@@ -60,6 +60,7 @@ bool Client::isPassSet() const { return _isPassSet; }
 bool Client::isNickSet() const { return _isNickSet; }
 bool Client::isUserSet() const { return _isUserSet; }
 bool Client::isAuthenticated() const { return _isAuthenticated; }
+bool Client::wantsToQuit() const { return _wantsToQuit; }
 int Client::getClientFd() const { return _clientFd; }
 const std::map<std::string, Channel *> &Client::getChannels() const {
   return _channels;
@@ -271,7 +272,8 @@ void Client::quit(const std::vector<std::string> &msg) {
                                         _hostname + " QUIT :" + reason);
   }
   // maybe we have to send a message to the client before closing the fd
-  _server->removeClient(_clientFd);
+  //_server->removeClient(_clientFd);
+  _wantsToQuit = true;
 }
 
 void Client::whois(const std::vector<std::string> &msg) {

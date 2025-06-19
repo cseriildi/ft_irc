@@ -77,6 +77,7 @@ class Client {
   bool isNickSet() const;
   bool isUserSet() const;
   bool isAuthenticated() const;
+  bool wantsToQuit() const;
   const std::map<std::string, Channel *> &getChannels() const;
 
  private:
@@ -101,6 +102,7 @@ class Client {
   bool _isNickSet;
   bool _isUserSet;
   bool _isAuthenticated;  // true after pass, nick, user
+  bool _wantsToQuit;
   Server *_server;
   std::string _inBuffer;
   std::string _outBuffer;

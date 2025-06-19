@@ -16,6 +16,7 @@
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "Channel.hpp"
 #include "Client.hpp"
@@ -233,6 +234,11 @@ bool Server::_handleClientActivity(size_t index) {
   if ((_pollFds[index].revents & POLLIN) != 0) {
     try {
       client->receive();
+	  if (client->wantsToQuit()) {
+		std::cout << "Client fd " << client_fd << " wants to quit\n";
+		removeClient(client_fd);
+		return false;
+	  }
     } catch (const std::runtime_error &e) {
       std::cerr << "Receive error on fd " << client_fd << ": " << e.what()
                 << "\n";
