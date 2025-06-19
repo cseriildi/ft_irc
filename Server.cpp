@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <__config>
+// #include <__config>
 #include <cerrno>
 #include <csignal>
 #include <cstddef>
@@ -22,7 +22,7 @@
 #include "Client.hpp"
 #include "utils.hpp"
 
-extern volatile sig_atomic_t g_terminate;  // NOLINT
+extern volatile sig_atomic_t g_terminate; // NOLINT
 
 const std::map<Server::ERR, std::string> Server::ERRORS = init_error_map();
 
@@ -60,20 +60,16 @@ std::map<Server::ERR, std::string> Server::init_error_map() {
   return errorMap;
 }
 
-Server::Server(const std::string& port, const std::string& pass)
-    : _port(port),
-      _sockfdIpv4(-1),
-      _sockfdIpv6(-1),
-      _res(NULL),
-      _name("localhost"),
-      _password(pass) {
-  _isPassRequired = !_password.empty();  // TODO: think about it
-  struct addrinfo hints = {};            // create hints struct for getaddrinfo
+Server::Server(const std::string &port, const std::string &pass)
+    : _port(port), _sockfdIpv4(-1), _sockfdIpv6(-1), _res(NULL),
+      _name("localhost"), _password(pass) {
+  _isPassRequired = !_password.empty(); // TODO: think about it
+  struct addrinfo hints = {};           // create hints struct for getaddrinfo
   std::memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;  // AF_INET for IPv4 only, AF_INET6 for IPv6,
-                                // AF_UNSPEC for both
-  hints.ai_socktype = SOCK_STREAM;  // TCP
-  hints.ai_flags = AI_PASSIVE;      // localhost address
+  hints.ai_family = AF_UNSPEC;     // AF_INET for IPv4 only, AF_INET6 for IPv6,
+                                   // AF_UNSPEC for both
+  hints.ai_socktype = SOCK_STREAM; // TCP
+  hints.ai_flags = AI_PASSIVE;     // localhost address
 
   // Create a linked list of adresses available fon the port
   const int status = getaddrinfo(NULL, _port.c_str(), &hints, &_res);
@@ -83,7 +79,7 @@ Server::Server(const std::string& port, const std::string& pass)
                              std::string(gai_strerror(status)));
   }
 
-  for (struct addrinfo* p = _res; p != NULL; p = p->ai_next) {
+  for (struct addrinfo *p = _res; p != NULL; p = p->ai_next) {
     try {
       if (p->ai_family == AF_INET) {
         _sockfdIpv4 = _bindAndListen(p);
@@ -92,7 +88,7 @@ Server::Server(const std::string& port, const std::string& pass)
         _sockfdIpv6 = _bindAndListen(p);
         std::cout << "Server is listening on port " << _port << " (IPv6)\n";
       }
-    } catch (const std::runtime_error& e) {
+    } catch (const std::runtime_error &e) {
       _cleanup();
       std::cerr << "Bind/listen error: " << e.what() << "\n";
       continue;
@@ -115,10 +111,10 @@ void Server::_cleanup() {
     _sockfdIpv6 = -1;
   }
   if (_res != 0) {
-    freeaddrinfo(_res);  // free the linked list, from netdb.h
+    freeaddrinfo(_res); // free the linked list, from netdb.h
     _res = NULL;
   }
-  std::map<int, Client*>::iterator it;
+  std::map<int, Client *>::iterator it;
   for (it = _clients.begin(); it != _clients.end(); ++it) {
     close(it->first);
     delete it->second;
@@ -126,7 +122,7 @@ void Server::_cleanup() {
   _clients.clear();
 }
 
-int Server::_bindAndListen(const struct addrinfo* res) {
+int Server::_bindAndListen(const struct addrinfo *res) {
   // Create a socket we can bind to, uses the nodes from getaddrinfo
   const int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
   if (sockfd == -1) {
@@ -202,7 +198,7 @@ void Server::_addPollFd(int fd, short events) {
   struct pollfd pfd = {};
   pfd.fd = fd;
   pfd.events = events;
-  pfd.revents = 0;  // return events, to be filled by poll
+  pfd.revents = 0; // return events, to be filled by poll
   _pollFds.push_back(pfd);
 }
 
@@ -211,7 +207,7 @@ void Server::_handleNewConnection(int sockfd) {
   socklen_t addrLen = sizeof(client_addr);
   // should not block now, since poll tells us there is a connection pending
   int const client_fd =
-      accept(sockfd, (struct sockaddr*)&client_addr, &addrLen);  // NOLINT
+      accept(sockfd, (struct sockaddr *)&client_addr, &addrLen); // NOLINT
 
   if (client_fd == -1) {
     std::cerr << "Accept error: " << strerror(errno) << "\n";
@@ -225,9 +221,10 @@ void Server::_handleNewConnection(int sockfd) {
 
 bool Server::_handleClientActivity(size_t index) {
   int const client_fd = _pollFds[index].fd;
-  Client* client = _clients[client_fd];
+  Client *client = _clients[client_fd];
 
-  if (client == 0) return true;
+  if (client == 0)
+    return true;
 
   if ((_pollFds[index].revents & (POLLHUP | POLLERR)) != 0) {
     std::cerr << "Client fd " << client_fd << " hangup or error\n";
@@ -237,7 +234,7 @@ bool Server::_handleClientActivity(size_t index) {
   if ((_pollFds[index].revents & POLLIN) != 0) {
     try {
       client->receive();
-    } catch (const std::runtime_error& e) {
+    } catch (const std::runtime_error &e) {
       std::cerr << "Receive error on fd " << client_fd << ": " << e.what()
                 << "\n";
       _removeClient(index, client_fd);
@@ -247,7 +244,7 @@ bool Server::_handleClientActivity(size_t index) {
   if ((_pollFds[index].revents & POLLOUT) != 0) {
     try {
       client->answer();
-    } catch (const std::runtime_error& e) {
+    } catch (const std::runtime_error &e) {
       std::cerr << "Send error on fd " << client_fd << ": " << e.what() << "\n";
       _removeClient(index, client_fd);
       return false;
@@ -260,13 +257,13 @@ bool Server::_handleClientActivity(size_t index) {
 }
 
 void Server::_removeClient(size_t index, int fd) {
-  close(fd);  // Close the file descriptor to prevent leaks
+  close(fd); // Close the file descriptor to prevent leaks
   delete _clients[fd];
   _clients.erase(fd);
-  _pollFds.erase(_pollFds.begin() + index);  // NOLINT
+  _pollFds.erase(_pollFds.begin() + index); // NOLINT
 }
 
-void Server::sendToClient(Client* client, const std::string& msg) {
+void Server::sendToClient(Client *client, const std::string &msg) {
   if (client == NULL || msg.empty()) {
     return;
   }
@@ -279,45 +276,45 @@ void Server::sendToClient(Client* client, const std::string& msg) {
   }
 }
 
-void Server::sendToChannel(Channel* channel, const std::string& msg,
-                           Client* sender) {
+void Server::sendToChannel(Channel *channel, const std::string &msg,
+                           Client *sender) {
   if (channel == NULL || msg.empty()) {
     return;
   }
-  std::map<int, Client*> clients = channel->getClients();
-  for (std::map<int, Client*>::const_iterator it = clients.begin();
+  std::map<int, Client *> clients = channel->getClients();
+  for (std::map<int, Client *>::const_iterator it = clients.begin();
        it != clients.end(); ++it) {
-    Client* client = it->second;
+    Client *client = it->second;
     if (client != sender) {
       sendToClient(client, msg);
     }
   }
 }
 
-bool Server::isNicknameAvailable(Client* user) const {
-  Client* found = findClient(user->getNick());
-  return found == nullptr || found == user;
+bool Server::isNicknameAvailable(Client *user) const {
+  Client *found = findClient(user->getNick());
+  return found == NULL || found == user;
 }
 
-const std::string& Server::getName() const { return _name; }
-const std::string& Server::getPort() const { return _port; }
-const std::string& Server::getPassword() const { return _password; }
+const std::string &Server::getName() const { return _name; }
+const std::string &Server::getPort() const { return _port; }
+const std::string &Server::getPassword() const { return _password; }
 bool Server::isPassRequired() const { return _isPassRequired; }
-const std::map<std::string, Channel*>& Server::getChannels() const {
+const std::map<std::string, Channel *> &Server::getChannels() const {
   return _channels;
 }
-const std::map<int, Client*>& Server::getClients() const { return _clients; }
+const std::map<int, Client *> &Server::getClients() const { return _clients; }
 
-void Server::removeChannel(const std::string& name) { _channels.erase(name); }
+void Server::removeChannel(const std::string &name) { _channels.erase(name); }
 
 void Server::removeClient(int cfd) { _clients.erase(cfd); }
 
-Client* Server::findClient(const std::string& nick) const {
-  for (std::map<int, Client*>::const_iterator it = _clients.begin();
+Client *Server::findClient(const std::string &nick) const {
+  for (std::map<int, Client *>::const_iterator it = _clients.begin();
        it != _clients.end(); ++it) {
     if (uppercase(it->second->getNick()) == uppercase(nick)) {
       return it->second;
     }
   }
-  return nullptr;
+  return NULL;
 }

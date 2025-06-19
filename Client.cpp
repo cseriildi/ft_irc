@@ -5,12 +5,13 @@
 
 #include <cstring>
 #include <iostream>
-#include <iterator>
+#include <cerrno>
 #include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <iomanip> 
 
 #include "Server.hpp"
 #include "utils.hpp"
@@ -42,13 +43,8 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
 }
 
 Client::Client(int sockfd, Server *server)
-    : _clientFd(sockfd),
-      _mode(0),
-      _isPassSet(false),
-      _isNickSet(false),
-      _isUserSet(false),
-      _isAuthenticated(false),
-      _server(server) {}
+    : _clientFd(sockfd), _mode(0), _isPassSet(false), _isNickSet(false),
+      _isUserSet(false), _isAuthenticated(false), _server(server) {}
 
 Client::~Client() {}
 
@@ -69,10 +65,10 @@ const std::map<std::string, Channel *> &Client::getChannels() const {
 
 void Client::receive() {
   char buffer[BUFFER_SIZE];
-  memset(buffer, 0, sizeof(buffer));  // NOLINT
+  memset(buffer, 0, sizeof(buffer)); // NOLINT
 
   const ssize_t received =
-      recv(_clientFd, buffer, sizeof(buffer) - 1, 0);  // NOLINT
+      recv(_clientFd, buffer, sizeof(buffer) - 1, 0); // NOLINT
   if (received == 0) {
     throw std::runtime_error("Client disconnected");
   }
@@ -80,7 +76,7 @@ void Client::receive() {
     throw std::runtime_error("Error receiving data: " +
                              std::string(strerror(errno)));
   }
-  _inBuffer.append(buffer, received);  // NOLINT
+  _inBuffer.append(buffer, received); // NOLINT
 
   size_t pos = 0;
   while ((pos = _inBuffer.find("\r\n")) != std::string::npos) {
@@ -94,7 +90,7 @@ void Client::answer() {
   std::cout << "Answering client: " << _outBuffer << '\n';
   while (!_outBuffer.empty()) {
     const ssize_t sent =
-        send(_clientFd, _outBuffer.c_str(), _outBuffer.length(), 0);  // NOLINT
+        send(_clientFd, _outBuffer.c_str(), _outBuffer.length(), 0); // NOLINT
     if (sent == -1) {
       throw std::runtime_error("Error sending data: " +
                                std::string(strerror(errno)));
@@ -110,7 +106,7 @@ void Client::handle(const std::string &msg) {
   std::vector<std::string> parsed = split(msg);
 
   if (parsed.empty()) {
-    return;  // Ignore empty lines
+    return; // Ignore empty lines
   }
 
   if (!_isAuthenticated && parsed[0] != "PASS" && parsed[0] != "NICK" &&
@@ -153,7 +149,7 @@ void Client::pass(const std::vector<std::string> &msg) {
   std::string password = msg[1];
 
   if (password[0] == ':')
-    password = password.substr(1);  // Maybe I can remove it in the split
+    password = password.substr(1); // Maybe I can remove it in the split
   // TODO: think about space in password
   _password = password;
   _isPassSet = true;
@@ -179,7 +175,8 @@ void Client::nick(const std::vector<std::string> &msg) {
   }
   std::string nick = msg[1];
 
-  if (nick[0] == ':') nick = nick.substr(1);
+  if (nick[0] == ':')
+    nick = nick.substr(1);
   if (nick.empty()) {
     createMessage(Server::ERR_NONICKNAMEGIVEN);
     return;
@@ -207,13 +204,13 @@ void Client::user(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_ALREADYREGISTRED);
     return;
   }
-  if (msg.size() < 5) {  // NOLINT
+  if (msg.size() < 5) { // NOLINT
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
 
   _user = msg[1];
-  _mode = 0;  // TODO: extract mode
+  _mode = 0; // TODO: extract mode
   _hostname = msg[3];
 
   std::string realname = msg[4];
@@ -234,10 +231,12 @@ void Client::cap(const std::vector<std::string> &msg) {
     for (std::map<std::string, CommandFunction>::const_iterator it =
              COMMANDS.begin();
          it != COMMANDS.end(); ++it) {
-      if (it->first != "CAP") {  // Don't include CAP itself
+      if (it->first != "CAP") { // Don't include CAP itself
         capabilities += it->first;
-        if (std::next(it) != COMMANDS.end()) {
-          capabilities += " ";  // Add space between capabilities
+        std::map<std::string, CommandFunction>::const_iterator nextIt = it;
+        ++nextIt;
+        if (nextIt != COMMANDS.end()) {
+          capabilities += " "; // Add space between capabilities
         }
       }
     }
@@ -273,11 +272,11 @@ void Client::quit(const std::vector<std::string> &msg) {
       if (channel->getOperators().empty()) {
         // TODO: check what to do
       } */
-      _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
-                                          _hostname + " QUIT :" + reason);
-   // }
+    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " QUIT :" + reason);
+    // }
   }
- // _server->removeClient(_clientFd);
+  // _server->removeClient(_clientFd);
 }
 
 void Client::whois(const std::vector<std::string> &msg) {
@@ -349,7 +348,7 @@ void Client::createMessage(ERR error_code, const std::string &param) {
 
 void Client::createMessage(RPL response_code) {
   std::stringstream ss;
-  ss << ":" << _server->getName() << " " << response_code << " " << _nick
+  ss << ":" << _server->getName() << " " << std::setw(3) << std::setfill('0') << response_code << " " << _nick
      << " ";
   if (response_code == Server::RPL_WELCOME) {
     ss << ":Welcome to the ft_irc server!" << _nick << "!~" << _user << "@"
@@ -357,18 +356,18 @@ void Client::createMessage(RPL response_code) {
   } else if (response_code == Server::RPL_YOURHOST) {
     ss << ":Your host is " << _server->getName() << ", running version ft_irc";
   } else if (response_code == Server::RPL_CREATED) {
-    ss << ":This server was created just now!";  // TODO
+    ss << ":This server was created just now!"; // TODO
   } else if (response_code == Server::RPL_MYINFO) {
     ss << _server->getName() << " ft_irc 1.0 :A simple IRC server";
   } else if (response_code == Server::RPL_LUSERCLIENT) {
     ss << ":There are " << _server->getClients().size()
-       << " users and 0 invisible on this server";  // TODO: check what's
-                                                    // invisible
+       << " users and 0 invisible on this server"; // TODO: check what's
+                                                   // invisible
   } else if (response_code == Server::RPL_LUSEROP) {
-    ss << ":There are 0 operators online";  // TODO: check what's operator on a
-                                            // server
+    ss << ":There are 0 operators online"; // TODO: check what's operator on a
+                                           // server
   } else if (response_code == Server::RPL_LUSERUNKNOWN) {
-    ss << ":There are 0 unknown connections";  // TODO: check what's unknown
+    ss << ":There are 0 unknown connections"; // TODO: check what's unknown
   } else if (response_code == Server::RPL_LUSERCHANNELS) {
     ss << ":There are " << _server->getChannels().size() << " channels created";
   } else if (response_code == Server::RPL_LUSERME) {
@@ -398,12 +397,14 @@ void Client::createMessage(RPL response_code, Client *targetClient) {
     for (std::map<std::string, Channel *>::const_iterator it = channels.begin();
          it != channels.end(); ++it) {
       ss << "#" << it->first;
-      if (std::next(it) != channels.end()) {
+      std::map<std::string, Channel *>::const_iterator nextIt = it;
+      ++nextIt;
+      if (nextIt != channels.end()) {
         ss << " ";
       }
     }
   } else if (response_code == Server::RPL_WHOISIDLE) {
-    ss << " 0 :seconds idle";  // TODO: implement idle time
+    ss << " 0 :seconds idle"; // TODO: implement idle time
   } else if (response_code == Server::RPL_WHOISSERVER) {
     ss << " " << _server->getName() << " :ft_irc server";
   } else {
