@@ -324,7 +324,7 @@ void Client::join(const std::vector<std::string> &msg) {
   if (target == "0") {
     for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
          ++it) {
-      part(std::vector<std::string>(1, it->first));
+      part(std::vector<std::string>{"PART", it->first});
     }
     return;
   }
