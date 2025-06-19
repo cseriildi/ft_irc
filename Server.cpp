@@ -228,7 +228,7 @@ bool Server::_handleClientActivity(size_t index) {
 
   if ((_pollFds[index].revents & (POLLHUP | POLLERR)) != 0) {
     std::cerr << "Client fd " << client_fd << " hangup or error\n";
-    _removeClient(index, client_fd);
+    removeClient(client_fd);
     return false;
   }
   if ((_pollFds[index].revents & POLLIN) != 0) {
@@ -237,7 +237,7 @@ bool Server::_handleClientActivity(size_t index) {
     } catch (const std::runtime_error &e) {
       std::cerr << "Receive error on fd " << client_fd << ": " << e.what()
                 << "\n";
-      _removeClient(index, client_fd);
+      removeClient(client_fd);
       return false;
     }
   }
@@ -246,7 +246,7 @@ bool Server::_handleClientActivity(size_t index) {
       client->answer();
     } catch (const std::runtime_error &e) {
       std::cerr << "Send error on fd " << client_fd << ": " << e.what() << "\n";
-      _removeClient(index, client_fd);
+      removeClient(client_fd);
       return false;
     }
     if (!client->wantsToWrite()) {
@@ -256,11 +256,20 @@ bool Server::_handleClientActivity(size_t index) {
   return true;
 }
 
-void Server::_removeClient(size_t index, int fd) {
-  close(fd); // Close the file descriptor to prevent leaks
-  delete _clients[fd];
-  _clients.erase(fd);
-  _pollFds.erase(_pollFds.begin() + index); // NOLINT
+void Server::removeClient(int fd) {
+  close(fd);
+  std::map<int, Client *>::iterator const it = _clients.find(fd);
+  if (it != _clients.end()) {
+	delete it->second;
+	_clients.erase(it);
+  }
+  for (std::vector<struct pollfd>::iterator it = _pollFds.begin();
+	   it != _pollFds.end(); ++it) {
+	if (it->fd == fd) {
+	  _pollFds.erase(it);
+	  break;
+	}
+  }
 }
 
 void Server::sendToClient(Client *client, const std::string &msg) {
@@ -306,8 +315,6 @@ const std::map<std::string, Channel *> &Server::getChannels() const {
 const std::map<int, Client *> &Server::getClients() const { return _clients; }
 
 void Server::removeChannel(const std::string &name) { _channels.erase(name); }
-
-void Server::removeClient(int cfd) { _clients.erase(cfd); }
 
 Client *Server::findClient(const std::string &nick) const {
   for (std::map<int, Client *>::const_iterator it = _clients.begin();
