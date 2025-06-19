@@ -350,7 +350,7 @@ void Client::join(const std::vector<std::string> &msg) {
     }
   }
   if (targetChannel->isLimited() &&
-      targetChannel->getLimit() >= targetChannel->getClients().size()) {
+      targetChannel->getClients().size() >= targetChannel->getLimit()) {
     createMessage(Server::ERR_CHANNELISFULL, target);
     return;
   }
