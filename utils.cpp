@@ -3,34 +3,37 @@
 #include <string>
 #include <vector>
 
-std::string uppercase(const std::string& str) {
+std::string uppercase(const std::string &str) {
   std::string result(str);
-  // TODO: Because of IRC's Scandinavian origin, the characters {}|^ are
-  // considered to be the lower case equivalents of the characters []\~,
-  // respectively. This is a critical issue when determining the
-  // equivalence of two nicknames or channel names.
-
   for (std::string::iterator it = result.begin(); it != result.end(); ++it) {
+    if (*it == '{') {
+      *it = '[';
+    } else if (*it == '|') {
+      *it = '\\';
+    } else if (*it == '^') {
+      *it = '~';
+    }
     *it = static_cast<char>(std::toupper(*it));
   }
   return result;
 }
 
-bool startsWith(const std::string& str, const std::string& prefix) {
+bool startsWith(const std::string &str, const std::string &prefix) {
   return str.size() >= prefix.size() &&
          uppercase(str).compare(0, prefix.size(), prefix) == 0;
 }
 
-std::vector<std::string> split(const std::string& line) {
+std::vector<std::string> split(const std::string &line) {
   std::vector<std::string> result;
   if (line.empty()) {
     return result;
   }
   std::string token;
   size_t pos = 0;
-  size_t found_colon = line.find(':');
+  size_t const found_colon = line.find(':');
 
-  size_t end = (found_colon == std::string::npos) ? line.length() : found_colon;
+  size_t const end =
+      (found_colon == std::string::npos) ? line.length() : found_colon;
 
   while (pos < end) {
     size_t found_space = line.find(' ', pos);

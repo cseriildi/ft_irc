@@ -39,7 +39,7 @@ class Channel {
   void setPass(const std::string &pass);
   void setLimited(bool limited);
   void setLimit(int limit);
-  
+
   void addClient(Client *client);
   void removeClient(int clientFd);
   void addOperator(Client *client);

@@ -7,8 +7,13 @@
 #include "Client.hpp"
 
 Channel::Channel(const std::string &name, Server *server)
-    : _name(name), _isInviteOnly(false), _topicSet(false), _passRequired(false),
-      _isLimited(false), _limit(0), _server(server) {}
+    : _name(name),
+      _isInviteOnly(false),
+      _topicSet(false),
+      _passRequired(false),
+      _isLimited(false),
+      _limit(0),
+      _server(server) {}
 
 Channel::~Channel() {}
 
@@ -54,6 +59,6 @@ void Channel::removeOperator(int clientFd) {
   }
   if (_operators.empty()) {
     _operators[_clients.begin()->first] = _clients.begin()->second;
-    //Not sure this is the right user to promote to operator
+    // Not sure this is the right user to promote to operator
   }
 }

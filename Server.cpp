@@ -22,7 +22,7 @@
 #include "Client.hpp"
 #include "utils.hpp"
 
-extern volatile sig_atomic_t g_terminate; // NOLINT
+extern volatile sig_atomic_t g_terminate;  // NOLINT
 
 const std::map<Server::ERR, std::string> Server::ERRORS = init_error_map();
 
@@ -61,15 +61,19 @@ std::map<Server::ERR, std::string> Server::init_error_map() {
 }
 
 Server::Server(const std::string &port, const std::string &pass)
-    : _port(port), _sockfdIpv4(-1), _sockfdIpv6(-1), _res(NULL),
-      _name("localhost"), _password(pass) {
-  _isPassRequired = !_password.empty(); // TODO: think about it
-  struct addrinfo hints = {};           // create hints struct for getaddrinfo
+    : _port(port),
+      _sockfdIpv4(-1),
+      _sockfdIpv6(-1),
+      _res(NULL),
+      _name("localhost"),
+      _password(pass) {
+  _isPassRequired = !_password.empty();  // TODO: think about it
+  struct addrinfo hints = {};            // create hints struct for getaddrinfo
   std::memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;     // AF_INET for IPv4 only, AF_INET6 for IPv6,
-                                   // AF_UNSPEC for both
-  hints.ai_socktype = SOCK_STREAM; // TCP
-  hints.ai_flags = AI_PASSIVE;     // localhost address
+  hints.ai_family = AF_UNSPEC;      // AF_INET for IPv4 only, AF_INET6 for IPv6,
+                                    // AF_UNSPEC for both
+  hints.ai_socktype = SOCK_STREAM;  // TCP
+  hints.ai_flags = AI_PASSIVE;      // localhost address
 
   // Create a linked list of adresses available fon the port
   const int status = getaddrinfo(NULL, _port.c_str(), &hints, &_res);
@@ -111,7 +115,7 @@ void Server::_cleanup() {
     _sockfdIpv6 = -1;
   }
   if (_res != 0) {
-    freeaddrinfo(_res); // free the linked list, from netdb.h
+    freeaddrinfo(_res);  // free the linked list, from netdb.h
     _res = NULL;
   }
   std::map<int, Client *>::iterator it;
@@ -198,7 +202,7 @@ void Server::_addPollFd(int fd, short events) {
   struct pollfd pfd = {};
   pfd.fd = fd;
   pfd.events = events;
-  pfd.revents = 0; // return events, to be filled by poll
+  pfd.revents = 0;  // return events, to be filled by poll
   _pollFds.push_back(pfd);
 }
 
@@ -207,7 +211,7 @@ void Server::_handleNewConnection(int sockfd) {
   socklen_t addrLen = sizeof(client_addr);
   // should not block now, since poll tells us there is a connection pending
   int const client_fd =
-      accept(sockfd, (struct sockaddr *)&client_addr, &addrLen); // NOLINT
+      accept(sockfd, (struct sockaddr *)&client_addr, &addrLen);  // NOLINT
 
   if (client_fd == -1) {
     std::cerr << "Accept error: " << strerror(errno) << "\n";
@@ -223,8 +227,7 @@ bool Server::_handleClientActivity(size_t index) {
   int const client_fd = _pollFds[index].fd;
   Client *client = _clients[client_fd];
 
-  if (client == 0)
-    return true;
+  if (client == 0) return true;
 
   if ((_pollFds[index].revents & (POLLHUP | POLLERR)) != 0) {
     std::cerr << "Client fd " << client_fd << " hangup or error\n";
@@ -234,11 +237,11 @@ bool Server::_handleClientActivity(size_t index) {
   if ((_pollFds[index].revents & POLLIN) != 0) {
     try {
       client->receive();
-	  if (client->wantsToQuit()) {
-		std::cout << "Client fd " << client_fd << " wants to quit\n";
-		removeClient(client_fd);
-		return false;
-	  }
+      if (client->wantsToQuit()) {
+        std::cout << "Client fd " << client_fd << " wants to quit\n";
+        removeClient(client_fd);
+        return false;
+      }
     } catch (const std::runtime_error &e) {
       std::cerr << "Receive error on fd " << client_fd << ": " << e.what()
                 << "\n";
@@ -265,15 +268,15 @@ void Server::removeClient(int fd) {
   close(fd);
   std::map<int, Client *>::iterator const it = _clients.find(fd);
   if (it != _clients.end()) {
-	delete it->second;
-	_clients.erase(it);
+    delete it->second;
+    _clients.erase(it);
   }
   for (std::vector<struct pollfd>::iterator it = _pollFds.begin();
-	   it != _pollFds.end(); ++it) {
-	if (it->fd == fd) {
-	  _pollFds.erase(it);
-	  break;
-	}
+       it != _pollFds.end(); ++it) {
+    if (it->fd == fd) {
+      _pollFds.erase(it);
+      break;
+    }
   }
 }
 
