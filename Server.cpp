@@ -8,7 +8,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-// #include <__config>
 #include <cerrno>
 #include <csignal>
 #include <cstddef>

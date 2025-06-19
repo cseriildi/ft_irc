@@ -1,11 +1,13 @@
 #include "Client.hpp"
 
+#include <cerrno>
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include <cstring>
-#include <iostream>
 #include <cerrno>
+#include <cstring>
+#include <iomanip>
+#include <iostream>
 #include <map>
 #include <sstream>
 #include <stdexcept>
@@ -264,19 +266,12 @@ void Client::quit(const std::vector<std::string> &msg) {
   for (std::map<std::string, Channel *>::iterator it = _channels.begin();
        it != _channels.end(); ++it) {
     Channel *channel = it->second;
-    /* channel->removeClient(this->getClientFd());
-    if (channel->getClients().empty()) {
-      _server->removeChannel(channel->getName());
-    } else {
-      channel->removeOperator(this->getClientFd());
-      if (channel->getOperators().empty()) {
-        // TODO: check what to do
-      } */
+    channel->removeClient(this->getClientFd());
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
                                         _hostname + " QUIT :" + reason);
-    // }
   }
-  // _server->removeClient(_clientFd);
+  // maybe we have to send a message to the client before closing the fd
+  _server->removeClient(_clientFd);
 }
 
 void Client::whois(const std::vector<std::string> &msg) {
@@ -348,8 +343,8 @@ void Client::createMessage(ERR error_code, const std::string &param) {
 
 void Client::createMessage(RPL response_code) {
   std::stringstream ss;
-  ss << ":" << _server->getName() << " " << std::setw(3) << std::setfill('0') << response_code << " " << _nick
-     << " ";
+  ss << ":" << _server->getName() << " " << std::setw(3) << std::setfill('0')
+     << response_code << " " << _nick << " ";
   if (response_code == Server::RPL_WELCOME) {
     ss << ":Welcome to the ft_irc server!" << _nick << "!~" << _user << "@"
        << _hostname;
@@ -402,6 +397,7 @@ void Client::createMessage(RPL response_code, Client *targetClient) {
       if (nextIt != channels.end()) {
         ss << " ";
       }
+      ss << "#" << it->first;
     }
   } else if (response_code == Server::RPL_WHOISIDLE) {
     ss << " 0 :seconds idle"; // TODO: implement idle time
