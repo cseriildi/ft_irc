@@ -1,52 +1,111 @@
 #pragma once
 
-#include "Message.hpp"
+#include <arpa/inet.h>  // for send, recv
+
+#include <map>
 #include <string>
-#include <arpa/inet.h> // for send, recv
+#include <vector>
 
-#define BUFFER_SIZE 512 // standard message size for IRC
+#include "Server.hpp"
 
-class Server;
+#define BUFFER_SIZE 512  // standard message size for IRC
+
+class Channel;
+
+typedef void (Client::*CommandFunction)(const std::vector<std::string> &);
 
 class Client {
-	public:
+ public:
+  enum TargetType { CLIENT, CHANNEL, SERVER };
 
-		Client(int sockfd, Server *server);
-		~Client();
+  typedef Server::ERR ERR;
+  typedef Server::RPL RPL;
 
-		void		handle();
-		void		receive();
-		void		answer();
-		bool		wantsToWrite() const;
-		void		appendToOutBuffer(const std::string &msg);
-		int			getFd() const;
+  static const std::map<std::string, CommandFunction> COMMANDS;
 
-		Message nick(const std::string &msg);
-		Message user(const std::string &msg);
-		Message pass(const std::string &msg);
-		Message who(const std::string &msg);
-		Message privmsg(const std::string &msg);
-		Message ping(const std::string &msg);
+  static std::map<std::string, CommandFunction> init_commands_map();
 
-		// Channel commands
-		Message join(const std::string &msg);
-		Message part(const std::string &msg);
-		Message kick(const std::string &msg);
-		Message invite(const std::string &msg);
-		Message topic(const std::string &msg);
-		Message mode(const std::string &msg);
-		Message list(const std::string &msg);
-		Message names(const std::string &msg);
+  Client(int sockfd, Server *server);
+  ~Client();
 
-	private:
+  void handle(const std::string &msg);
+  void receive();
+  void answer();
+  bool wantsToWrite() const;
+  void appendToOutBuffer(const std::string &msg);
+  int getFd() const;
 
-		//Instance of IRC interpeter, called with a string, returns a string
-		Client();
-		Client(const Client &other);
-		Client &operator=(const Client &other);
+  void createMessage(const std::string &msg, TargetType _targetType,
+                     const std::string &target);
+  void createMessage(ERR error_code, const std::string &command = "");
+  void createMessage(const std::string &msg, const std::string &command = "");
 
-		int			_clientFd;
-		Server*		_server;
-		std::string	_inBuffer;
-		std::string	_outBuffer;
+  void createMessage(RPL response_code);
+  void createMessage(RPL response_code, Client *targetClient);
+
+  void pass(const std::vector<std::string> &msg);
+  void nick(const std::vector<std::string> &msg);
+  void user(const std::vector<std::string> &msg);
+  void who(const std::vector<std::string> &msg);
+  void whois(const std::vector<std::string> &msg);
+  void privmsg(const std::vector<std::string> &msg);
+  void ping(const std::vector<std::string> &msg);
+
+  // Channel comman
+  void join(const std::vector<std::string> &msg);
+  void part(const std::vector<std::string> &msg);
+  void kick(const std::vector<std::string> &msg);
+  void invite(const std::vector<std::string> &msg);
+  void topic(const std::vector<std::string> &msg);
+  void mode(const std::vector<std::string> &msg);
+  void names(const std::vector<std::string> &msg);
+
+  // Server commands
+  void cap(const std::vector<std::string> &msg);
+  void quit(const std::vector<std::string> &msg);
+  void list(const std::vector<std::string> &msg);
+
+  // getters
+  int getClientFd() const;
+  const std::string &getNick() const;
+  const std::string &getUser() const;
+  int getMode() const;
+  const std::string &getHostname() const;
+  const std::string &getRealName() const;
+  const std::string &getPassword() const;
+  bool isPassSet() const;
+  bool isNickSet() const;
+  bool isUserSet() const;
+  bool isAuthenticated() const;
+  bool wantsToQuit() const;
+  const std::map<std::string, Channel *> &getChannels() const;
+
+ private:
+  // Instance of IRC interpeter, called with a string, returns a string
+  Client();
+  Client(const Client &other);
+  Client &operator=(const Client &other);
+
+  void _authenticate();
+  void _broadcastNickChange(const std::string &newNick);
+
+  int _clientFd;
+  std::string _nick;
+  std::string _user;
+  int _mode;  // TODO: check what does this mean: bit 2 - w, bit 3 - i
+              // (https://www.rfc-editor.org/rfc/rfc2812.html#section-3.1.5)
+  std::string _hostname;
+  std::string _realName;
+  std::string _password;
+
+  bool _isPassSet;
+  bool _isNickSet;
+  bool _isUserSet;
+  bool _isAuthenticated;  // true after pass, nick, user
+  bool _wantsToQuit;
+  Server *_server;
+  std::string _inBuffer;
+  std::string _outBuffer;
+  std::map<std::string, Channel *>
+      _channels;  // channels the client is in, with channel name as key
 };
