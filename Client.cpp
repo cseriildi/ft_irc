@@ -322,10 +322,13 @@ void Client::join(const std::vector<std::string> &msg) {
     return;
   }
   if (target == "0") {
+    std::vector<std::string> channels;
+    channels.push_back("PART");
     for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
          ++it) {
-      part(std::vector<std::string>{"PART", it->first});
+      channels.push_back(it->first);
     }
+    part(channels);
     return;
   }
   // Validated channel name
