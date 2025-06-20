@@ -3,6 +3,9 @@
 #include <string>
 #include <vector>
 
+#include "Channel.hpp"
+#include "Client.hpp"
+
 std::string uppercase(const std::string &str) {
   std::string result(str);
   for (std::string::iterator it = result.begin(); it != result.end(); ++it) {
@@ -53,4 +56,32 @@ std::vector<std::string> split(const std::string &line) {
   if (!result.empty()) result[0] = uppercase(result[0]);
 
   return result;
+}
+
+Client *findClient(const ClientList &clients, int fd) {
+  const ClientList::const_iterator it = clients.find(fd);
+  if (it != clients.end()) {
+    return it->second;
+  }
+  return NULL;
+}
+
+Client *findClient(const ClientList &clients, const std::string &nick) {
+  for (ClientList::const_iterator it = clients.begin(); it != clients.end();
+       ++it) {
+    // TODO: case insensitive comparison
+    if (it->second->getNick() == nick) {
+      return it->second;
+    }
+  }
+  return NULL;
+}
+
+Channel *findChannel(const ChannelList &channels, const std::string &name) {
+  const ChannelList::const_iterator it = channels.find(name);
+  // TODO: case insensitive comparison
+  if (it != channels.end()) {
+    return it->second;
+  }
+  return NULL;
 }

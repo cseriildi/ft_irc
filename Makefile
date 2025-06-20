@@ -55,6 +55,10 @@ run: all
 	@echo
 	@./$(NAME) $(ARGS)
 
+.PHONY: debug
+debug: CXXFLAGS += -DDEBUG
+debug: re run
+
 .PHONY: val
 val: re
 	@echo

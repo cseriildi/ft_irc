@@ -66,9 +66,7 @@ bool Client::isUserSet() const { return _isUserSet; }
 bool Client::isAuthenticated() const { return _isAuthenticated; }
 bool Client::wantsToQuit() const { return _wantsToQuit; }
 int Client::getClientFd() const { return _clientFd; }
-const std::map<std::string, Channel *> &Client::getChannels() const {
-  return _channels;
-}
+const ChannelList &Client::getChannels() const { return _channels; }
 
 void Client::receive() {
   char buffer[BUFFER_SIZE];
@@ -94,7 +92,10 @@ void Client::receive() {
 }
 
 void Client::answer() {
-  std::cout << "Answering client: " << _outBuffer << '\n';
+#ifdef DEBUG
+  std::cout << "> Answered: " << _outBuffer << '\n';
+#endif
+
   while (!_outBuffer.empty()) {
     const ssize_t sent =
         send(_clientFd, _outBuffer.c_str(), _outBuffer.length(), 0);  // NOLINT
@@ -109,13 +110,16 @@ void Client::answer() {
 bool Client::wantsToWrite() const { return !_outBuffer.empty(); }
 
 void Client::handle(const std::string &msg) {
+#ifdef DEBUG
+  std::cout << "< Received: " << msg << '\n';
+#endif
+
   // TODO: think about leading spaces
   std::vector<std::string> parsed = split(msg);
 
   if (parsed.empty()) {
     return;  // Ignore empty lines
   }
-
   if (!_isAuthenticated && parsed[0] != "PASS" && parsed[0] != "NICK" &&
       parsed[0] != "USER" && parsed[0] != "CAP") {
     createMessage(Server::ERR_NOTREGISTERED);
@@ -169,7 +173,7 @@ void Client::_broadcastNickChange(const std::string &newNick) {
   _server->sendToClient(this, msg);
 
   // to the user's channels
-  for (std::map<std::string, Channel *>::const_iterator it = _channels.begin();
+  for (ChannelList::const_iterator it = _channels.begin();
        it != _channels.end(); ++it) {
     _server->sendToChannel(it->second, msg);
   }
@@ -267,12 +271,15 @@ void Client::quit(const std::vector<std::string> &msg) {
       reason = reason.substr(1);
     }
   }
-  for (std::map<std::string, Channel *>::iterator it = _channels.begin();
-       it != _channels.end(); ++it) {
+  for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
+       ++it) {
     Channel *channel = it->second;
     channel->removeClient(_clientFd);
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
                                         _hostname + " QUIT :" + reason);
+    if (channel->getClients().empty()) {
+      _server->removeChannel(channel->getName());
+    }
   }
   // maybe we have to send a message to the client before closing the fd
   //_server->removeClient(_clientFd);
@@ -288,7 +295,7 @@ void Client::whois(const std::vector<std::string> &msg) {
   if (target[0] == ':') {
     target = target.substr(1);
   }
-  Client *targetClient = _server->findClient(target);
+  Client *targetClient = findClient(_server->getClients(), target);
   if (targetClient == NULL) {
     createMessage(Server::ERR_NOSUCHNICK, target);
     return;
@@ -302,8 +309,123 @@ void Client::whois(const std::vector<std::string> &msg) {
 
 void Client::who(const std::vector<std::string> &msg) { (void)msg; }
 void Client::privmsg(const std::vector<std::string> &msg) { (void)msg; }
-void Client::join(const std::vector<std::string> &msg) { (void)msg; }
-void Client::part(const std::vector<std::string> &msg) { (void)msg; }
+
+void Client::join(const std::vector<std::string> &msg) {
+  if (msg.size() < 2) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  std::string target = msg[1];
+  // TODO: multiple channels
+  if (target[0] == ':') {
+    target = target.substr(1);
+  }
+  if (target.empty()) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  if (target == "0") {
+    std::vector<std::string> channels;
+    channels.push_back("PART");
+    for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
+         ++it) {
+      channels.push_back(it->first);
+    }
+    part(channels);
+    return;
+  }
+  // Validated channel name
+  if (!Channel::isValidName(target)) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, target);
+    // TODO: make sure this is the right error code
+    return;
+  }
+
+  Channel *targetChannel = findChannel(_server->getChannels(), target);
+  if (targetChannel == NULL) {
+    targetChannel = new Channel(target, _server);
+    _server->addChannel(targetChannel);
+  }
+  if (findChannel(_channels, target) != NULL) {
+    return;  // Already in the channel
+  }
+  if (targetChannel->isInviteOnly()) {
+    if (findClient(targetChannel->getInvited(), _clientFd) == NULL) {
+      createMessage(Server::ERR_INVITEONLYCHAN, target);
+      return;
+    }
+  }
+  if (targetChannel->isLimited() &&
+      targetChannel->getClients().size() >= targetChannel->getLimit()) {
+    createMessage(Server::ERR_CHANNELISFULL, target);
+    return;
+  }
+  if (targetChannel->isPassRequired()) {
+    if (msg.size() < 3) {
+      // TODO: check if this is the right error code
+      createMessage(Server::ERR_NEEDMOREPARAMS, "");
+      return;
+    }
+    const std::string &pass = msg[2];
+    if (pass != targetChannel->getPassword()) {
+      createMessage(Server::ERR_PASSWDMISMATCH, pass);
+      return;
+    }
+  }
+  // TODO: check the channel limit for user ERR_TOOMANYCHANNELS
+  targetChannel->addClient(this);
+  _channels[target] = targetChannel;
+  // If a JOIN is successful, the user receives a JOIN message as
+  // confirmation and is then sent the channel's topic (using RPL_TOPIC) and
+  // the list of users who are on the channel (using RPL_NAMREPLY), which
+  // MUST include the user joining.
+
+  // TODO: send confirmation to client
+  // RPL_TOPIC;
+  // RPL_NAMREPLY;
+
+  _server->sendToChannel(targetChannel, ":" + _nick + "!~" + _user + "@" +
+                                            _hostname + " JOIN " + target);
+}
+
+void Client::part(const std::vector<std::string> &msg) {
+  if (msg.size() < 2) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  std::string target = msg[1];
+  if (target[0] == ':') {
+    target = target.substr(1);
+  }
+  if (target.empty()) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  // TODO: multiple channels
+  Channel *channel = findChannel(_server->getChannels(), target);
+  if (channel == NULL) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, target);
+    return;
+  }
+  if (findChannel(_channels, target) == NULL) {
+    createMessage(Server::ERR_NOTONCHANNEL, target);
+    return;
+  }
+  // TODO: check default part message
+  std::string reason = "Client left the channel";
+  if (msg.size() > 2) {
+    reason = msg[2];
+    if (reason[0] == ':') {
+      reason = reason.substr(1);
+    }
+  }
+  _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" + _hostname +
+                                      " PART " + target + " :" + reason);
+  channel->removeClient(_clientFd);
+  // TODO: check if we need to confirm
+  _channels.erase(target);
+}
+
 void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
 void Client::invite(const std::vector<std::string> &msg) { (void)msg; }
 void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
@@ -364,8 +486,8 @@ void Client::createMessage(RPL response_code) {
        << " users and 0 invisible on this server";  // TODO: check what's
                                                     // invisible
   } else if (response_code == Server::RPL_LUSEROP) {
-    ss << ":There are 0 operators online";  // TODO: check what's operator on a
-                                            // server
+    ss << ":There are 0 operators online";  // TODO: check what's operator on
+                                            // a server
   } else if (response_code == Server::RPL_LUSERUNKNOWN) {
     ss << ":There are 0 unknown connections";  // TODO: check what's unknown
   } else if (response_code == Server::RPL_LUSERCHANNELS) {
@@ -388,16 +510,15 @@ void Client::createMessage(RPL response_code, Client *targetClient) {
     ss << " ~" << targetClient->getUser() << " " << targetClient->getHostname()
        << " * :" << targetClient->getRealName();
   } else if (response_code == Server::RPL_WHOISCHANNELS) {
-    const std::map<std::string, Channel *> &channels =
-        targetClient->getChannels();
+    const ChannelList &channels = targetClient->getChannels();
     if (channels.empty()) {
       return;
     }
     ss << " :";
-    for (std::map<std::string, Channel *>::const_iterator it = channels.begin();
+    for (ChannelList::const_iterator it = channels.begin();
          it != channels.end(); ++it) {
       ss << "#" << it->first;
-      std::map<std::string, Channel *>::const_iterator nextIt = it;
+      ChannelList::const_iterator nextIt = it;
       ++nextIt;
       if (nextIt != channels.end()) {
         ss << " ";

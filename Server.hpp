@@ -11,6 +11,9 @@
 #define MAX_CLIENTS 100
 #define TIMEOUT 5000  // poll will block for this long unless an event occurs
 
+typedef std::map<int, Client *> ClientList;
+typedef std::map<std::string, Channel *> ChannelList;
+
 class Client;
 class Server {
  public:
@@ -88,8 +91,6 @@ class Server {
                      Client *sender = NULL);
 
   static std::map<Server::ERR, std::string> init_error_map();
-
-  Client *findClient(const std::string &nick) const;
   bool isNicknameAvailable(Client *user) const;
 
   // getters
@@ -97,8 +98,9 @@ class Server {
   const std::string &getPort() const;
   const std::string &getPassword() const;
   bool isPassRequired() const;
-  const std::map<std::string, Channel *> &getChannels() const;
-  const std::map<int, Client *> &getClients() const;
+  const ChannelList &getChannels() const;
+  const ClientList &getClients() const;
+
   void removeChannel(const std::string &name);
   void removeClient(int cfd);
   void addChannel(Channel *channel);
@@ -121,8 +123,8 @@ class Server {
   int _sockfdIpv6;
   struct addrinfo *_res;
   std::vector<struct pollfd> _pollFds;  // vector of the fds we are polling
-  std::map<int, Client *> _clients;     // with client_fd as key
-  std::map<std::string, Channel *> _channels;  // with channel name as key
+  ClientList _clients;                  // with client_fd as key
+  ChannelList _channels;                // with channel name as key
   std::string _name;
   bool _isPassRequired;
   std::string _password;

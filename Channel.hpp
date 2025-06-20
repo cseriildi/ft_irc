@@ -1,27 +1,29 @@
 #pragma once
 
+#include <cstddef>
 #include <map>
 #include <string>
 
 class Server;
 class Client;
 
+typedef std::map<int, Client *> ClientList;
+
 class Channel {
  public:
   Channel(const std::string &name, Server *server);
   ~Channel();
 
-  std::string join(int clientFd, const std::string &pass = "");
-  std::string part(int clientFd);
-  std::string kick(int clientFd, const std::string &nick,
-                   const std::string &reason = "");
-  std::string invite(int clientFd, const std::string &nick);
-  std::string topic(int clientFd, const std::string &topic = "");
-  std::string mode(int clientFd, const std::string &modes);
-  std::string privmsg(int clientFd, const std::string &msg);
+  void kick(int clientFd, const std::string &nick,
+            const std::string &reason = "");
+  void invite(int clientFd, const std::string &nick);
+  void topic(int clientFd, const std::string &topic = "");
+  void mode(int clientFd, const std::string &modes);
+  void privmsg(int clientFd, const std::string &msg);
 
-  std::map<int, Client *> getClients() const;
-  std::map<int, Client *> getOperators() const;
+  ClientList getClients() const;
+  ClientList getOperators() const;
+  ClientList getInvited() const;
   std::string getName() const;
   std::string getTopic() const;
   std::string getPassword() const;
@@ -30,7 +32,7 @@ class Channel {
   bool isPassRequired() const;
   std::string getPass() const;
   bool isLimited() const;
-  int getLimit() const;
+  size_t getLimit() const;
   void setTopic(const std::string &topic);
   void setPassword(const std::string &password);
   void setInviteOnly(bool inviteOnly);
@@ -38,12 +40,14 @@ class Channel {
   void setPassRequired(bool passRequired);
   void setPass(const std::string &pass);
   void setLimited(bool limited);
-  void setLimit(int limit);
+  void setLimit(size_t limit);
 
   void addClient(Client *client);
   void removeClient(int clientFd);
   void addOperator(Client *client);
   void removeOperator(int clientFd);
+
+  static bool isValidName(const std::string &name);
 
  private:
   Channel();
@@ -58,8 +62,9 @@ class Channel {
   bool _passRequired;
   std::string _pass;
   bool _isLimited;
-  int _limit;
-  std::map<int, Client *> _clients;
-  std::map<int, Client *> _operators;
+  size_t _limit;
+  ClientList _clients;
+  ClientList _operators;
+  ClientList _invited;
   Server *_server;
 };
