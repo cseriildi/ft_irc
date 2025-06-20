@@ -57,12 +57,12 @@ void Channel::addClient(Client *client) {
   if (client == NULL) {
     return;
   }
-  _clients[client->getFd()] = client;
+  _clients[client->getClientFd()] = client;
   if (_operators.empty()) {
-    _operators[client->getFd()] = client;
+    _operators[client->getClientFd()] = client;
   }
   if (_isInviteOnly) {
-    _invited.erase(client->getFd());
+    _invited.erase(client->getClientFd());
   }
 }
 
@@ -79,7 +79,7 @@ void Channel::addOperator(Client *client) {
   if (client == NULL) {
     return;
   }
-  _operators[client->getFd()] = client;
+  _operators[client->getClientFd()] = client;
 }
 
 void Channel::removeOperator(int clientFd) {

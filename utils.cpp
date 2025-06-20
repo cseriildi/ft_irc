@@ -1,5 +1,6 @@
 #include <cctype>
 #include <cstddef>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -84,4 +85,15 @@ Channel *findChannel(const ChannelList &channels, const std::string &name) {
     return it->second;
   }
   return NULL;
+}
+
+std::string get_time(std::time_t t) {
+  std::string result = std::ctime(&t);
+  if (result.empty()) {
+    return "unknown time";
+  }
+  if (*(result.end() - 1) == '\n') {
+    result.erase(result.end() - 1);
+  }
+  return result;
 }
