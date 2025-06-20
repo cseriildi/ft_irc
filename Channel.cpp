@@ -71,10 +71,6 @@ void Channel::removeClient(int clientFd) {
   if (it != _clients.end()) {
     _clients.erase(it);
   }
-  if (_clients.empty()) {
-    _server->removeChannel(_name);
-    return;
-  }
   removeOperator(clientFd);
   // broadcast to channel that client has left
 }
@@ -90,7 +86,7 @@ void Channel::removeOperator(int clientFd) {
   if (findClient(_operators, clientFd) != NULL) {
     _operators.erase(clientFd);
   }
-  if (_operators.empty()) {
+  if (_operators.empty() && !_clients.empty()) {
     addOperator(_clients.begin()->second);
     // Not sure this is the right user to promote to operator
   }

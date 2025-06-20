@@ -277,6 +277,9 @@ void Client::quit(const std::vector<std::string> &msg) {
     channel->removeClient(_clientFd);
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
                                         _hostname + " QUIT :" + reason);
+    if (channel->getClients().empty()) {
+      _server->removeChannel(channel->getName());
+    }
   }
   // maybe we have to send a message to the client before closing the fd
   //_server->removeClient(_clientFd);
