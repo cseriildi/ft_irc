@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <ctime>
 #include <map>
 #include <string>
 #include <vector>
@@ -44,7 +45,8 @@ class Server {
     RPL_ENDOFWHO = 315,
     RPL_NAMREPLY = 353,
     RPL_ENDOFNAMES = 366,
-    RPL_YOUREOPER = 381
+    RPL_YOUREOPER = 381,
+    RPL_TIME = 391
   };
 
   enum ERR {
@@ -100,6 +102,7 @@ class Server {
   bool isPassRequired() const;
   const ChannelList &getChannels() const;
   const ClientList &getClients() const;
+  std::time_t getCreatedAt() const;
 
   void removeChannel(const std::string &name);
   void removeClient(int cfd);
@@ -128,4 +131,5 @@ class Server {
   std::string _name;
   bool _isPassRequired;
   std::string _password;
+  std::time_t _createdAt;
 };

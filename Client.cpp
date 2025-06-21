@@ -5,6 +5,7 @@
 
 #include <cerrno>
 #include <cstring>
+#include <ctime>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -432,26 +433,10 @@ void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
 void Client::mode(const std::vector<std::string> &msg) { (void)msg; }
 void Client::names(const std::vector<std::string> &msg) { (void)msg; }
 void Client::list(const std::vector<std::string> &msg) { (void)msg; }
+// send RPL_LIST for each channel and then RPL_LISTEND
 
 void Client::appendToOutBuffer(const std::string &msg) {
   _outBuffer += msg + "\r\n";
-}
-
-int Client::getFd() const { return _clientFd; }
-
-void Client::createMessage(const std::string &msg,
-                           Client::TargetType targetType,
-                           const std::string &target) {
-  (void)targetType;
-  (void)target;
-
-  _server->sendToClient(this, msg);
-}
-
-void Client::createMessage(const std::string &msg, const std::string &command) {
-  (void)command;
-
-  _server->sendToClient(this, msg);
 }
 
 void Client::createMessage(ERR error_code, const std::string &param) {
@@ -473,29 +458,32 @@ void Client::createMessage(RPL response_code) {
   ss << ":" << _server->getName() << " " << std::setw(3) << std::setfill('0')
      << response_code << " " << _nick << " ";
   if (response_code == Server::RPL_WELCOME) {
-    ss << ":Welcome to the ft_irc server!" << _nick << "!~" << _user << "@"
-       << _hostname;
+    ss << ":Welcome to the Internet Relay Network " << _nick << "!~" << _user
+       << "@" << _hostname;
   } else if (response_code == Server::RPL_YOURHOST) {
-    ss << ":Your host is " << _server->getName() << ", running version ft_irc";
+    ss << ":Your host is " << _server->getName() << ", running version 1.0";
   } else if (response_code == Server::RPL_CREATED) {
-    ss << ":This server was created just now!";  // TODO
+    ss << ":This server was created " << get_time(_server->getCreatedAt());
   } else if (response_code == Server::RPL_MYINFO) {
-    ss << _server->getName() << " ft_irc 1.0 :A simple IRC server";
+    ss << _server->getName() << " 1.0 "
+       << "available user modes, available channel modes";  // TODO
   } else if (response_code == Server::RPL_LUSERCLIENT) {
     ss << ":There are " << _server->getClients().size()
-       << " users and 0 invisible on this server";  // TODO: check what's
-                                                    // invisible
+       << " users and 0 invisible on this server";
+    // TODO: check what's invisible
   } else if (response_code == Server::RPL_LUSEROP) {
-    ss << ":There are 0 operators online";  // TODO: check what's operator on
-                                            // a server
+    ss << ":There are 0 operators online";
+    // TODO: check what's operator on a server
   } else if (response_code == Server::RPL_LUSERUNKNOWN) {
     ss << ":There are 0 unknown connections";  // TODO: check what's unknown
   } else if (response_code == Server::RPL_LUSERCHANNELS) {
     ss << ":There are " << _server->getChannels().size() << " channels created";
   } else if (response_code == Server::RPL_LUSERME) {
     ss << ":I have a total of " << _server->getClients().size() << " clients";
-  } else if (response_code == Server::RPL_ENDOFWHOIS) {
-    ss << " :End of WHOIS list for " << _nick;
+  } else if (response_code == Server::RPL_LISTEND) {
+    ss << ":End of LIST";
+  } else if (response_code == Server::RPL_TIME) {
+    ss << _server->getName() << " :" << get_time(_server->getCreatedAt());
   } else {
     ss << ":Unknown response code";
   }
@@ -505,30 +493,70 @@ void Client::createMessage(RPL response_code) {
 void Client::createMessage(RPL response_code, Client *targetClient) {
   std::stringstream ss;
   ss << ":" << _server->getName() << " " << response_code << " " << _nick << " "
-     << targetClient->getNick();
+     << targetClient->getNick() << " ";
   if (response_code == Server::RPL_WHOISUSER) {
-    ss << " ~" << targetClient->getUser() << " " << targetClient->getHostname()
-       << " * :" << targetClient->getRealName();
+    ss << "~" << targetClient->getUser() << " " << targetClient->getHostname()
+       << "* :" << targetClient->getRealName();
   } else if (response_code == Server::RPL_WHOISCHANNELS) {
+    ss << ":";
     const ChannelList &channels = targetClient->getChannels();
-    if (channels.empty()) {
-      return;
-    }
-    ss << " :";
     for (ChannelList::const_iterator it = channels.begin();
          it != channels.end(); ++it) {
-      ss << "#" << it->first;
+      if (findClient(it->second->getClients(), targetClient->_clientFd) !=
+          NULL) {
+        ss << "@";  // Channel operator
+      }
+      ss << it->first;
       ChannelList::const_iterator nextIt = it;
       ++nextIt;
       if (nextIt != channels.end()) {
         ss << " ";
       }
-      ss << "#" << it->first;
     }
-  } else if (response_code == Server::RPL_WHOISIDLE) {
-    ss << " 0 :seconds idle";  // TODO: implement idle time
   } else if (response_code == Server::RPL_WHOISSERVER) {
-    ss << " " << _server->getName() << " :ft_irc server";
+    ss << _server->getName() << " :ft_irc server";
+  } else if (response_code == Server::RPL_ENDOFWHOIS) {
+    ss << ":End of WHOIS list";
+    _server->sendToClient(this, ss.str());
+  } else {
+    ss << ":Unknown response code";
+  }
+}
+
+void Client::createMessage(RPL response_code, Channel *targetChannel) {
+  if (targetChannel == NULL) {
+    return;
+  }
+  std::stringstream ss;
+  ss << ":" << _server->getName() << " " << response_code << " " << _nick << " "
+     << targetChannel->getName() << " ";
+
+  if (response_code == Server::RPL_LIST) {
+    ss << ":" << targetChannel->getName() << " "
+       << targetChannel->getClients().size() << " :"
+       << targetChannel->getTopic();
+  } else if (response_code == Server::RPL_CHANNELMODEIS) {
+    // ss << targetChannel->getMode(); TODO
+  } else if (response_code == Server::RPL_NOTOPIC) {
+    ss << ":No topic is set";
+  } else if (response_code == Server::RPL_TOPIC) {
+    ss << ":" << targetChannel->getTopic();
+  } else {
+    ss << ":Unknown response code";
+  }
+  _server->sendToClient(this, ss.str());
+}
+
+void Client::createMessage(RPL response_code, Channel *targetChannel,
+                           Client *targetClient) {
+  if (targetChannel == NULL || targetClient == NULL) {
+    return;
+  }
+  std::stringstream ss;
+  ss << ":" << _server->getName() << " " << response_code << " " << _nick << " "
+     << targetChannel->getName() << " ";
+  if (response_code == Server::RPL_INVITING) {
+    ss << targetClient->getNick();
   } else {
     ss << ":Unknown response code";
   }

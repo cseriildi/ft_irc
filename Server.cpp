@@ -12,6 +12,7 @@
 #include <csignal>
 #include <cstddef>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <map>
 #include <stdexcept>
@@ -65,8 +66,9 @@ Server::Server(const std::string &port, const std::string &pass)
       _sockfdIpv4(-1),
       _sockfdIpv6(-1),
       _res(NULL),
-      _name("localhost"),
-      _password(pass) {
+      _name("localhost"),  // TODO
+      _password(pass),
+      _createdAt(std::time(NULL)) {
   _isPassRequired = !_password.empty();  // TODO: think about it
   struct addrinfo hints = {};            // create hints struct for getaddrinfo
   std::memset(&hints, 0, sizeof(hints));
@@ -286,7 +288,7 @@ void Server::sendToClient(Client *client, const std::string &msg) {
   }
   client->appendToOutBuffer(msg);
   for (size_t i = 0; i < _pollFds.size(); ++i) {
-    if (_pollFds[i].fd == client->getFd()) {
+    if (_pollFds[i].fd == client->getClientFd()) {
       _pollFds[i].events |= POLLOUT;
       break;
     }
@@ -321,13 +323,14 @@ const std::map<std::string, Channel *> &Server::getChannels() const {
   return _channels;
 }
 const ClientList &Server::getClients() const { return _clients; }
+std::time_t Server::getCreatedAt() const { return _createdAt; }
 
 void Server::addClient(Client *client) {
   if (client == NULL) {
     return;
   }
-  _clients[client->getFd()] = client;
-  _addPollFd(client->getFd(), POLLIN);
+  _clients[client->getClientFd()] = client;
+  _addPollFd(client->getClientFd(), POLLIN);
 }
 
 void Server::addChannel(Channel *channel) {

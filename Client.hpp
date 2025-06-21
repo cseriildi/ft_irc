@@ -34,15 +34,13 @@ class Client {
   void answer();
   bool wantsToWrite() const;
   void appendToOutBuffer(const std::string &msg);
-  int getFd() const;
 
-  void createMessage(const std::string &msg, TargetType _targetType,
-                     const std::string &target);
-  void createMessage(ERR error_code, const std::string &command = "");
-  void createMessage(const std::string &msg, const std::string &command = "");
-
+  void createMessage(ERR error_code, const std::string &param = "");
   void createMessage(RPL response_code);
   void createMessage(RPL response_code, Client *targetClient);
+  void createMessage(RPL response_code, Channel *targetChannel);
+  void createMessage(RPL response_code, Channel *targetChannel,
+                     Client *targetClient);
 
   void pass(const std::vector<std::string> &msg);
   void nick(const std::vector<std::string> &msg);

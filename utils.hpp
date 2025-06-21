@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -13,3 +14,5 @@ std::string uppercase(const std::string &str);
 Client *findClient(const ClientList &clients, int fd);
 Client *findClient(const ClientList &clients, const std::string &nick);
 Channel *findChannel(const ChannelList &channels, const std::string &name);
+
+std::string get_time(std::time_t t);
