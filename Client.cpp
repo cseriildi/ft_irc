@@ -309,7 +309,33 @@ void Client::whois(const std::vector<std::string> &msg) {
 }
 
 void Client::who(const std::vector<std::string> &msg) { (void)msg; }
-void Client::privmsg(const std::vector<std::string> &msg) { (void)msg; }
+
+void Client::privmsg(const std::vector<std::string> &msg) {
+  if (msg.size() < 2) {
+    createMessage(Server::ERR_NORECIPIENT, msg[0]);
+    return;
+  }
+  if (msg.size() < 3) {
+    createMessage(Server::ERR_NOTEXTTOSEND, msg[0]);
+    return;
+  }
+  std::string target = msg[1];
+  if (target[0] == ':') {
+    target = target.substr(1);
+  }
+  std::string text = msg[2];
+  if (text[0] == ':') {
+    text = text.substr(1);
+  }
+  Client *targetClient = findClient(_server->getClients(), target);
+  if (targetClient == NULL) {
+    createMessage(Server::ERR_NOSUCHNICK, target);
+    return;
+  }
+  const std::string toSend = ":" + _nick + "!~" + _user + "@" + _hostname +
+                             " PRIVMSG " + target + " :" + text;
+  _server->sendToClient(targetClient, toSend);
+}
 
 void Client::join(const std::vector<std::string> &msg) {
   if (msg.size() < 2) {
