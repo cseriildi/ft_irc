@@ -196,7 +196,7 @@ void Client::nick(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_ERRONEUSNICKNAME, nick);
     return;
   }
-  if (!_server->isNicknameAvailable(this)) {
+  if (!_server->isNicknameAvailable(this, nick)) {
     createMessage(Server::ERR_NICKNAMEINUSE, nick);
     return;
   }

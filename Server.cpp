@@ -310,9 +310,19 @@ void Server::sendToChannel(Channel *channel, const std::string &msg,
   }
 }
 
-bool Server::isNicknameAvailable(Client *user) const {
-  Client *found = findClient(_clients, user->getClientFd());
-  return found == NULL || found == user;
+bool Server::isNicknameAvailable(const Client *user,
+                                 const std::string &nick) const {
+  for (ClientList::const_iterator it = _clients.begin(); it != _clients.end();
+       ++it) {
+    const Client *other = it->second;
+    if (other == user) {
+      continue;
+    }
+    if (other->getNick() == nick) {
+      return false;
+    }
+  }
+  return true;
 }
 
 const std::string &Server::getName() const { return _name; }
