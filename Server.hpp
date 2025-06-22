@@ -93,7 +93,7 @@ class Server {
                      Client *sender = NULL);
 
   static std::map<Server::ERR, std::string> init_error_map();
-  bool isNicknameAvailable(Client *user) const;
+  bool isNicknameAvailable(const Client *user, const std::string &nick) const;
 
   // getters
   const std::string &getName() const;
