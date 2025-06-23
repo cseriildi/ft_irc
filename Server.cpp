@@ -267,12 +267,16 @@ bool Server::_handleClientActivity(size_t index) {
 }
 
 void Server::removeClient(int fd) {
-  close(fd);
-  const ClientList::iterator it = _clients.find(fd);
-  if (it != _clients.end()) {
-    delete it->second;
-    _clients.erase(it);
+  Client *client = findClient(_clients, fd);
+  if (client == NULL) {
+    return;
   }
+  if (!client->getChannels().empty()) {
+    client->handle("JOIN 0");  // leave all channels, and broadcast
+  }
+  close(fd);
+  delete client;
+  _clients.erase(fd);
   for (std::vector<struct pollfd>::iterator it = _pollFds.begin();
        it != _pollFds.end(); ++it) {
     if (it->fd == fd) {
