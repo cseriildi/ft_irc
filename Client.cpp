@@ -319,6 +319,16 @@ void Client::privmsg(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_NOTEXTTOSEND, msg[0]);
     return;
   }
+  if ((msg[1].size() > 0 && (msg[1][0] == '#' || msg[1][0] == '&' || msg[1][0] == '+' || msg[1][0] == '!')) ||
+      (msg[1].size() > 1 && (msg[1][1] == '#' || msg[1][1] == '&' || msg[1][1] == '+' || msg[1][1] == '!'))) {
+    _messageChannel(msg);
+  } else {
+    _messageClient(msg);
+  }
+ 
+}
+
+void Client::_messageClient(const std::vector<std::string> &msg) {
   std::string target = msg[1];
   if (target[0] == ':') {
     target = target.substr(1);
@@ -335,6 +345,25 @@ void Client::privmsg(const std::vector<std::string> &msg) {
   const std::string toSend = ":" + _nick + "!~" + _user + "@" + _hostname +
                              " PRIVMSG " + target + " :" + text;
   _server->sendToClient(targetClient, toSend);
+}
+
+void Client::_messageChannel(const std::vector<std::string> &msg) {
+  std::string target = msg[1];
+  if (target[0] == ':') {
+    target = target.substr(1);
+  }
+  std::string text = msg[2];
+  if (text[0] == ':') {
+    text = text.substr(1);
+  }
+  Channel *targetChannel = findChannel(_server->getChannels(), target);
+  if (targetChannel == NULL) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, target);
+    return;
+  }
+  const std::string toSend = ":" + _nick + "!~" + _user + "@" + _hostname +
+                             " PRIVMSG " + target + " :" + text;
+  _server->sendToChannel(targetChannel, toSend, this);
 }
 
 void Client::join(const std::vector<std::string> &msg) {
