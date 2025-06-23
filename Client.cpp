@@ -264,6 +264,17 @@ void Client::ping(const std::vector<std::string> &msg) {
   _server->sendToClient(this, "PONG " + msg[1]);
 }
 
+void Client::removeChannel(const std::string &name) {
+  Channel *channel = findChannel(_channels, name);
+  if (channel != NULL) {
+    _channels.erase(name);
+    channel->removeClient(_clientFd);
+    if (channel->getClients().empty()) {
+      _server->removeChannel(channel->getName());
+    }
+  }
+}
+
 void Client::quit(const std::vector<std::string> &msg) {
   std::string reason = "Client quit";
   if (msg.size() > 1) {
@@ -272,18 +283,12 @@ void Client::quit(const std::vector<std::string> &msg) {
       reason = reason.substr(1);
     }
   }
-  for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
-       ++it) {
-    Channel *channel = it->second;
-    channel->removeClient(_clientFd);
-    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
-                                        _hostname + " QUIT :" + reason);
-    if (channel->getClients().empty()) {
-      _server->removeChannel(channel->getName());
-    }
+  while (!_channels.empty()) {
+    _server->sendToChannel(
+        _channels.begin()->second,
+        ":" + _nick + "!~" + _user + "@" + _hostname + " QUIT :" + reason);
+    removeChannel(_channels.begin()->first);
   }
-  // maybe we have to send a message to the client before closing the fd
-  //_server->removeClient(_clientFd);
   _wantsToQuit = true;
 }
 
@@ -448,9 +453,9 @@ void Client::part(const std::vector<std::string> &msg) {
   }
   _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" + _hostname +
                                       " PART " + target + " :" + reason);
-  channel->removeClient(_clientFd);
+
+  removeChannel(target);
   // TODO: check if we need to confirm
-  _channels.erase(target);
 }
 
 void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
