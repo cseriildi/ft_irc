@@ -81,6 +81,8 @@ class Client {
 
   static bool isValidName(const std::string &name);
 
+   void removeChannel(const std::string &name);
+
  private:
   // Instance of IRC interpeter, called with a string, returns a string
   Client();
