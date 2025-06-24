@@ -366,6 +366,10 @@ void Client::_messageChannel(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_NOSUCHCHANNEL, target);
     return;
   }
+  if (findChannel(_channels, target) == NULL) {
+    createMessage(Server::ERR_CANNOTSENDTOCHAN, target);
+    return;
+  }
   const std::string toSend = ":" + _nick + "!~" + _user + "@" + _hostname +
                              " PRIVMSG " + target + " :" + text;
   _server->sendToChannel(targetChannel, toSend, this);
