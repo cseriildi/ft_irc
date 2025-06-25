@@ -224,41 +224,23 @@ void Client::user(const std::vector<std::string> &msg) {
 
 void Client::cap(const std::vector<std::string> &msg) {
   if (msg.size() >= 2 && msg[1] == "LS") {
-    std::string capabilities = ":" + _server->getName() + " CAP " +
-                               (_isAuthenticated ? _nick : "*") + " LS :";
-    for (std::map<std::string, CommandFunction>::const_iterator it =
-             COMMANDS.begin();
-         it != COMMANDS.end(); ++it) {
-      if (it->first != "CAP") {  // Don't include CAP itself
-        capabilities += it->first;
-        std::map<std::string, CommandFunction>::const_iterator nextIt = it;
-        ++nextIt;
-        if (nextIt != COMMANDS.end()) {
-          capabilities += " ";  // Add space between capabilities
-        }
-      }
-    }
-    _server->sendToClient(this, capabilities);
+    _server->sendToClient(this, ":" + _server->getName() + " CAP " +
+                                    (_isAuthenticated ? _nick : "*") + " LS :");
   }
+  // https://ircv3.net/specs/extensions/capability-negotiation.html
 }
 
 void Client::ping(const std::vector<std::string> &msg) {
   if (msg.size() < 2 || msg[1].empty()) {
-    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    createMessage(Server::ERR_NOORIGIN);
     return;
   }
-  // TODO: 2 params given
-  _server->sendToClient(this, "PONG " + msg[1]);
-}
-
-void Client::removeChannel(const std::string &name) {
-  Channel *channel = findChannel(_channels, name);
-  if (channel != NULL) {
-    _channels.erase(name);
-    channel->removeClient(_clientFd);
-    if (channel->getClients().empty()) {
-      _server->removeChannel(channel->getName());
-    }
+  if (msg.size() == 2) {
+    _server->sendToClient(this, "PONG :" + msg[1]);
+  } else if (msg[2] == _server->getName()) {
+    _server->sendToClient(this, "PONG " + msg[2] + " " + msg[1]);
+  } else {
+    createMessage(Server::ERR_NOSUCHSERVER, msg[2]);
   }
 }
 
