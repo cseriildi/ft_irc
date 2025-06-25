@@ -45,7 +45,6 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
 
 Client::Client(int sockfd, Server *server)
     : _clientFd(sockfd),
-      _mode(0),
       _isPassSet(false),
       _isNickSet(false),
       _isUserSet(false),
