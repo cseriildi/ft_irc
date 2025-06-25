@@ -17,7 +17,7 @@
 #include "Server.hpp"
 #include "utils.hpp"
 
-// * Static members initialization */
+// * Static members initialization *
 
 const std::map<std::string, CommandFunction> Client::COMMANDS =
     Client::init_commands_map();
@@ -44,7 +44,7 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
   return commands;
 }
 
-// * Constructors and destructors */
+// * Constructors and destructors *
 
 Client::Client(int sockfd, Server *server)
     : _clientFd(sockfd),
@@ -57,7 +57,7 @@ Client::Client(int sockfd, Server *server)
 
 Client::~Client() {}
 
-// * Getters and setters */
+// * Getters and setters *
 
 const std::string &Client::getNick() const { return _nick; }
 const std::string &Client::getUser() const { return _user; }

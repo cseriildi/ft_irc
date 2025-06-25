@@ -29,19 +29,8 @@ class Client {
   Client(int sockfd, Server *server);
   ~Client();
 
+  // * COMMANDS *
   void handle(const std::string &msg);
-  void receive();
-  void answer();
-  bool wantsToWrite() const;
-  void appendToOutBuffer(const std::string &msg);
-
-  void createMessage(ERR error_code, const std::string &param = "");
-  void createMessage(RPL response_code);
-  void createMessage(RPL response_code, Client *targetClient);
-  void createMessage(RPL response_code, Channel *targetChannel);
-  void createMessage(RPL response_code, Channel *targetChannel,
-                     Client *targetClient);
-
   void pass(const std::vector<std::string> &msg);
   void nick(const std::vector<std::string> &msg);
   void user(const std::vector<std::string> &msg);
@@ -49,8 +38,11 @@ class Client {
   void whois(const std::vector<std::string> &msg);
   void privmsg(const std::vector<std::string> &msg);
   void ping(const std::vector<std::string> &msg);
+  void cap(const std::vector<std::string> &msg);
+  void quit(const std::vector<std::string> &msg);
+  void list(const std::vector<std::string> &msg);
 
-  // Channel commands
+  // * CHANNEL COMMANDS *
   void join(const std::vector<std::string> &msg);
   void part(const std::vector<std::string> &msg);
   void kick(const std::vector<std::string> &msg);
@@ -59,12 +51,7 @@ class Client {
   void mode(const std::vector<std::string> &msg);
   void names(const std::vector<std::string> &msg);
 
-  // Server commands
-  void cap(const std::vector<std::string> &msg);
-  void quit(const std::vector<std::string> &msg);
-  void list(const std::vector<std::string> &msg);
-
-  // getters
+  // * GETTERS AND SETTERS *
   int getClientFd() const;
   const std::string &getNick() const;
   const std::string &getUser() const;
@@ -76,11 +63,23 @@ class Client {
   bool isUserSet() const;
   bool isAuthenticated() const;
   bool wantsToQuit() const;
+  bool wantsToWrite() const;
   const ChannelList &getChannels() const;
 
+  // * HELPERS *
   static bool isValidName(const std::string &name);
-
   void removeChannel(const std::string &name);
+  void appendToOutBuffer(const std::string &msg);
+
+  // * COMMUNICATION *
+  void receive();
+  void answer();
+  void createMessage(ERR error_code, const std::string &param = "");
+  void createMessage(RPL response_code);
+  void createMessage(RPL response_code, Client *targetClient);
+  void createMessage(RPL response_code, Channel *targetChannel);
+  void createMessage(RPL response_code, Channel *targetChannel,
+                     Client *targetClient);
 
  private:
   Client();
