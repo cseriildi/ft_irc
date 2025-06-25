@@ -156,12 +156,7 @@ void Client::pass(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
-  std::string password = msg[1];
-
-  if (password[0] == ':')
-    password = password.substr(1);  // Maybe I can remove it in the split
-  // TODO: think about space in password
-  _password = password;
+  _password = msg[1];
   _isPassSet = true;
 }
 void Client::_broadcastNickChange(const std::string &newNick) {
@@ -183,9 +178,8 @@ void Client::nick(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
-  std::string nick = msg[1];
+  const std::string &nick = msg[1];
 
-  if (nick[0] == ':') nick = nick.substr(1);
   if (nick.empty()) {
     createMessage(Server::ERR_NONICKNAMEGIVEN);
     return;
@@ -221,12 +215,7 @@ void Client::user(const std::vector<std::string> &msg) {
   _user = msg[1];
   // mode is usually ignored in irc servers
   _hostname = msg[3];
-
-  std::string realname = msg[4];
-  if (realname[0] == ':') {
-    realname = realname.substr(1);
-  }
-  _realName = realname;
+  _realName = msg[4];
   _isUserSet = true;
   if (_isNickSet) {
     _authenticate();
@@ -254,7 +243,7 @@ void Client::cap(const std::vector<std::string> &msg) {
 }
 
 void Client::ping(const std::vector<std::string> &msg) {
-  if (msg.size() != 2 || msg[1] == ":") {
+  if (msg.size() < 2 || msg[1].empty()) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
@@ -274,13 +263,9 @@ void Client::removeChannel(const std::string &name) {
 }
 
 void Client::quit(const std::vector<std::string> &msg) {
-  std::string reason = "Client quit";
-  if (msg.size() > 1) {
-    reason = msg[1];
-    if (reason[0] == ':') {
-      reason = reason.substr(1);
-    }
-  }
+  const std::string reason = (msg.size() > 1 ? msg[1] : "Client quit");
+
+  // TODO: make a function to broadcast to all channels of the client
   while (!_channels.empty()) {
     _server->sendToChannel(
         _channels.begin()->second,
@@ -291,14 +276,12 @@ void Client::quit(const std::vector<std::string> &msg) {
 }
 
 void Client::whois(const std::vector<std::string> &msg) {
-  if (msg.size() < 2) {
+  if (msg.size() < 2 || msg[1].empty()) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
-  std::string target = msg[1];
-  if (target[0] == ':') {
-    target = target.substr(1);
-  }
+  const std::string &target = msg[1];
+
   Client *targetClient = findClient(_server->getClients(), target);
   if (targetClient == NULL) {
     createMessage(Server::ERR_NOSUCHNICK, target);
@@ -315,19 +298,12 @@ void Client::who(const std::vector<std::string> &msg) { (void)msg; }
 void Client::privmsg(const std::vector<std::string> &msg) { (void)msg; }
 
 void Client::join(const std::vector<std::string> &msg) {
-  if (msg.size() < 2) {
+  if (msg.size() < 2 || msg[1].empty()) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
-  std::string target = msg[1];
+  const std::string &target = msg[1];
   // TODO: multiple channels
-  if (target[0] == ':') {
-    target = target.substr(1);
-  }
-  if (target.empty()) {
-    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
-    return;
-  }
   if (target == "0") {
     std::vector<std::string> channels;
     channels.push_back("PART");
@@ -393,18 +369,12 @@ void Client::join(const std::vector<std::string> &msg) {
 }
 
 void Client::part(const std::vector<std::string> &msg) {
-  if (msg.size() < 2) {
+  if (msg.size() < 2 || msg[1].empty()) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
-  std::string target = msg[1];
-  if (target[0] == ':') {
-    target = target.substr(1);
-  }
-  if (target.empty()) {
-    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
-    return;
-  }
+  const std::string &target = msg[1];
+
   // TODO: multiple channels
   Channel *channel = findChannel(_server->getChannels(), target);
   if (channel == NULL) {
@@ -416,18 +386,11 @@ void Client::part(const std::vector<std::string> &msg) {
     return;
   }
   // TODO: check default part message
-  std::string reason = "Client left the channel";
-  if (msg.size() > 2) {
-    reason = msg[2];
-    if (reason[0] == ':') {
-      reason = reason.substr(1);
-    }
-  }
+  const std::string reason =
+      (msg.size() > 2 ? msg[2] : "Client left the channel");
   _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" + _hostname +
                                       " PART " + target + " :" + reason);
-
   removeChannel(target);
-  // TODO: check if we need to confirm
 }
 
 void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
