@@ -17,6 +17,8 @@
 #include "Server.hpp"
 #include "utils.hpp"
 
+// * Static members initialization */
+
 const std::map<std::string, CommandFunction> Client::COMMANDS =
     Client::init_commands_map();
 
@@ -39,9 +41,10 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
   commands["WHO"] = &Client::who;
   commands["WHOIS"] = &Client::whois;
   commands["PRIVMSG"] = &Client::privmsg;
-  // TODO: add rest of commands
   return commands;
 }
+
+// * Constructors and destructors */
 
 Client::Client(int sockfd, Server *server)
     : _clientFd(sockfd),
@@ -54,6 +57,8 @@ Client::Client(int sockfd, Server *server)
 
 Client::~Client() {}
 
+// * Getters and setters */
+
 const std::string &Client::getNick() const { return _nick; }
 const std::string &Client::getUser() const { return _user; }
 const std::string &Client::getHostname() const { return _hostname; }
@@ -64,49 +69,11 @@ bool Client::isNickSet() const { return _isNickSet; }
 bool Client::isUserSet() const { return _isUserSet; }
 bool Client::isAuthenticated() const { return _isAuthenticated; }
 bool Client::wantsToQuit() const { return _wantsToQuit; }
+bool Client::wantsToWrite() const { return !_outBuffer.empty(); }
 int Client::getClientFd() const { return _clientFd; }
 const ChannelList &Client::getChannels() const { return _channels; }
 
-void Client::receive() {
-  char buffer[BUFFER_SIZE];
-  memset(buffer, 0, sizeof(buffer));  // NOLINT
-
-  const ssize_t received =
-      recv(_clientFd, buffer, sizeof(buffer) - 1, 0);  // NOLINT
-  if (received == 0) {
-    throw std::runtime_error("Client disconnected");
-  }
-  if (received == -1) {
-    throw std::runtime_error("Error receiving data: " +
-                             std::string(strerror(errno)));
-  }
-  _inBuffer.append(buffer, received);  // NOLINT
-
-  size_t pos = 0;
-  while ((pos = _inBuffer.find("\r\n")) != std::string::npos) {
-    std::string const line = _inBuffer.substr(0, pos);
-    handle(line);
-    _inBuffer.erase(0, pos + 2);
-  }
-}
-
-void Client::answer() {
-#ifdef DEBUG
-  std::cout << "> Answered: " << _outBuffer << '\n';
-#endif
-
-  while (!_outBuffer.empty()) {
-    const ssize_t sent =
-        send(_clientFd, _outBuffer.c_str(), _outBuffer.length(), 0);  // NOLINT
-    if (sent == -1) {
-      throw std::runtime_error("Error sending data: " +
-                               std::string(strerror(errno)));
-    }
-    _outBuffer.erase(0, sent);
-  }
-}
-
-bool Client::wantsToWrite() const { return !_outBuffer.empty(); }
+// * COMMANDS *
 
 void Client::handle(const std::string &msg) {
 #ifdef DEBUG
@@ -134,19 +101,6 @@ void Client::handle(const std::string &msg) {
   (this->*command)(parsed);
 }
 
-void Client::_authenticate() {
-  if (_server->isPassRequired() &&
-      (!_isPassSet || _server->getPassword() != _password)) {
-    createMessage(Server::ERR_PASSWDMISMATCH);
-    return;
-  }
-  _isAuthenticated = true;
-  createMessage(Server::RPL_WELCOME);
-  createMessage(Server::RPL_YOURHOST);
-  createMessage(Server::RPL_CREATED);
-  createMessage(Server::RPL_MYINFO);
-}
-
 void Client::pass(const std::vector<std::string> &msg) {
   if (_isPassSet) {
     createMessage(Server::ERR_ALREADYREGISTRED);
@@ -158,19 +112,6 @@ void Client::pass(const std::vector<std::string> &msg) {
   }
   _password = msg[1];
   _isPassSet = true;
-}
-void Client::_broadcastNickChange(const std::string &newNick) {
-  const std::string msg =
-      ":" + _nick + "!~" + _user + "@" + _hostname + " NICK :" + newNick;
-
-  // to self
-  _server->sendToClient(this, msg);
-
-  // to the user's channels
-  for (ChannelList::const_iterator it = _channels.begin();
-       it != _channels.end(); ++it) {
-    _server->sendToChannel(it->second, msg);
-  }
 }
 
 void Client::nick(const std::vector<std::string> &msg) {
@@ -287,6 +228,8 @@ void Client::join(const std::vector<std::string> &msg) {
   const std::string &target = msg[1];
   // TODO: multiple channels
   if (target == "0") {
+    // TODO: call the broadcast to all channels of the client function with PART
+    // TODO: make a remove all channels function
     std::vector<std::string> channels;
     channels.push_back("PART");
     for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
@@ -307,15 +250,13 @@ void Client::join(const std::vector<std::string> &msg) {
   if (targetChannel == NULL) {
     targetChannel = new Channel(target, _server);
     _server->addChannel(targetChannel);
-  }
-  if (findChannel(_channels, target) != NULL) {
+  } else if (findChannel(_channels, target) != NULL) {
     return;  // Already in the channel
   }
-  if (targetChannel->isInviteOnly()) {
-    if (findClient(targetChannel->getInvited(), _clientFd) == NULL) {
-      createMessage(Server::ERR_INVITEONLYCHAN, target);
-      return;
-    }
+  if (targetChannel->isInviteOnly() &&
+      findClient(targetChannel->getInvited(), _clientFd) == NULL) {
+    createMessage(Server::ERR_INVITEONLYCHAN, target);
+    return;
   }
   if (targetChannel->isLimited() &&
       targetChannel->getClients().size() >= targetChannel->getLimit()) {
@@ -383,9 +324,94 @@ void Client::names(const std::vector<std::string> &msg) { (void)msg; }
 void Client::list(const std::vector<std::string> &msg) { (void)msg; }
 // send RPL_LIST for each channel and then RPL_LISTEND
 
+// * HELPERS *
+
+void Client::removeChannel(const std::string &name) {
+  Channel *channel = findChannel(_channels, name);
+  if (channel != NULL) {
+    _channels.erase(name);
+    channel->removeClient(_clientFd);
+    if (channel->getClients().empty()) {
+      _server->removeChannel(channel->getName());
+    }
+  }
+}
+
+void Client::_authenticate() {
+  if (_server->isPassRequired() &&
+      (!_isPassSet || _server->getPassword() != _password)) {
+    createMessage(Server::ERR_PASSWDMISMATCH);
+    return;
+  }
+  _isAuthenticated = true;
+  createMessage(Server::RPL_WELCOME);
+  createMessage(Server::RPL_YOURHOST);
+  createMessage(Server::RPL_CREATED);
+  createMessage(Server::RPL_MYINFO);
+}
+
+void Client::_broadcastNickChange(const std::string &newNick) {
+  // TODO: get rid of this function
+  // TODO: call broadcast to all channels of the client function
+  const std::string msg =
+      ":" + _nick + "!~" + _user + "@" + _hostname + " NICK :" + newNick;
+
+  // to self
+  _server->sendToClient(this, msg);
+
+  // to the user's channels
+  for (ChannelList::const_iterator it = _channels.begin();
+       it != _channels.end(); ++it) {
+    _server->sendToChannel(it->second, msg);
+  }
+}
+
 void Client::appendToOutBuffer(const std::string &msg) {
   _outBuffer += msg + "\r\n";
 }
+
+// * COMMUNICATION *
+
+void Client::receive() {
+  char buffer[BUFFER_SIZE];
+  memset(buffer, 0, sizeof(buffer));  // NOLINT
+
+  const ssize_t received =
+      recv(_clientFd, buffer, sizeof(buffer) - 1, 0);  // NOLINT
+  if (received == 0) {
+    throw std::runtime_error("Client disconnected");
+  }
+  if (received == -1) {
+    throw std::runtime_error("Error receiving data: " +
+                             std::string(strerror(errno)));
+  }
+  _inBuffer.append(buffer, received);  // NOLINT
+
+  size_t pos = 0;
+  while ((pos = _inBuffer.find("\r\n")) != std::string::npos) {
+    std::string const line = _inBuffer.substr(0, pos);
+    handle(line);
+    _inBuffer.erase(0, pos + 2);
+  }
+}
+
+void Client::answer() {
+#ifdef DEBUG
+  std::cout << "> Answered: " << _outBuffer << '\n';
+#endif
+
+  while (!_outBuffer.empty()) {
+    const ssize_t sent =
+        send(_clientFd, _outBuffer.c_str(), _outBuffer.length(), 0);  // NOLINT
+    if (sent == -1) {
+      throw std::runtime_error("Error sending data: " +
+                               std::string(strerror(errno)));
+    }
+    _outBuffer.erase(0, sent);
+  }
+}
+
+// * MESSAGES *
 
 void Client::createMessage(ERR error_code, const std::string &param) {
   std::stringstream ss;
