@@ -8,6 +8,7 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <sstream>
 #include <stdexcept>
@@ -81,7 +82,7 @@ void Client::handle(const std::string &msg) {
 #endif
 
   // TODO: think about leading spaces
-  std::vector<std::string> parsed = split(msg);
+  std::vector<std::string> parsed = parse(msg);
 
   if (parsed.empty()) {
     return;  // Ignore empty lines
@@ -225,9 +226,10 @@ void Client::join(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
-  const std::string &target = msg[1];
-  // TODO: multiple channels
-  if (target == "0") {
+  const std::vector<std::string> channels = split(msg[1], ',');
+  const std::vector<std::string> keys =
+      split((msg.size() > 2 ? msg[2] : ""), ',');
+  if (*channels.begin() == "0") {
     // TODO: call the broadcast to all channels of the client function with PART
     // TODO: make a remove all channels function
     std::vector<std::string> channels;
@@ -239,56 +241,59 @@ void Client::join(const std::vector<std::string> &msg) {
     part(channels);
     return;
   }
-  // Validated channel name
-  if (!Channel::isValidName(target)) {
-    createMessage(Server::ERR_NOSUCHCHANNEL, target);
-    // TODO: make sure this is the right error code
-    return;
-  }
-
-  Channel *targetChannel = findChannel(_server->getChannels(), target);
-  if (targetChannel == NULL) {
-    targetChannel = new Channel(target, _server);
-    _server->addChannel(targetChannel);
-  } else if (findChannel(_channels, target) != NULL) {
-    return;  // Already in the channel
-  }
-  if (targetChannel->isInviteOnly() &&
-      findClient(targetChannel->getInvited(), _clientFd) == NULL) {
-    createMessage(Server::ERR_INVITEONLYCHAN, target);
-    return;
-  }
-  if (targetChannel->isLimited() &&
-      targetChannel->getClients().size() >= targetChannel->getLimit()) {
-    createMessage(Server::ERR_CHANNELISFULL, target);
-    return;
-  }
-  if (targetChannel->isPassRequired()) {
-    if (msg.size() < 3) {
-      // TODO: check if this is the right error code
-      createMessage(Server::ERR_NEEDMOREPARAMS, "");
-      return;
+  for (std::vector<std::string>::const_iterator it = channels.begin();
+       it != channels.end(); ++it) {
+    if (!Channel::isValidName(*it)) {
+      createMessage(Server::ERR_NOSUCHCHANNEL, *it);
+      // TODO: make sure this is the right error code
+      continue;
     }
-    const std::string &pass = msg[2];
-    if (pass != targetChannel->getPassword()) {
-      createMessage(Server::ERR_PASSWDMISMATCH, pass);
-      return;
+
+    Channel *targetChannel = findChannel(_server->getChannels(), *it);
+    if (targetChannel == NULL) {
+      targetChannel = new Channel(*it, _server);
+      _server->addChannel(targetChannel);
+    } else if (findChannel(_channels, *it) != NULL) {
+      continue;  // Already in the channel
     }
+    if (targetChannel->isInviteOnly() &&
+        findClient(targetChannel->getInvited(), _clientFd) == NULL) {
+      createMessage(Server::ERR_INVITEONLYCHAN, *it);
+      continue;
+    }
+    if (targetChannel->isLimited() &&
+        targetChannel->getClients().size() >= targetChannel->getLimit()) {
+      createMessage(Server::ERR_CHANNELISFULL, *it);
+      continue;
+    }
+    if (targetChannel->isPassRequired()) {
+      size_t const index = std::distance(channels.begin(), it);
+      if (index >= keys.size()) {
+        // TODO: check if this is the right error code
+        createMessage(Server::ERR_PASSWDMISMATCH, *it);
+        continue;
+      }
+      const std::string &pass = keys[index];
+      if (pass != targetChannel->getPassword()) {
+        createMessage(Server::ERR_PASSWDMISMATCH, pass);
+        continue;
+      }
+    }
+    // TODO: check the channel limit for user ERR_TOOMANYCHANNELS
+    targetChannel->addClient(this);
+    _channels[*it] = targetChannel;
+    // If a JOIN is successful, the user receives a JOIN message as
+    // confirmation and is then sent the channel's topic (using RPL_TOPIC) and
+    // the list of users who are on the channel (using RPL_NAMREPLY), which
+    // MUST include the user joining.
+
+    // TODO: send confirmation to client
+    // RPL_TOPIC;
+    // RPL_NAMREPLY;
+
+    _server->sendToChannel(targetChannel, ":" + _nick + "!~" + _user + "@" +
+                                              _hostname + " JOIN " + *it);
   }
-  // TODO: check the channel limit for user ERR_TOOMANYCHANNELS
-  targetChannel->addClient(this);
-  _channels[target] = targetChannel;
-  // If a JOIN is successful, the user receives a JOIN message as
-  // confirmation and is then sent the channel's topic (using RPL_TOPIC) and
-  // the list of users who are on the channel (using RPL_NAMREPLY), which
-  // MUST include the user joining.
-
-  // TODO: send confirmation to client
-  // RPL_TOPIC;
-  // RPL_NAMREPLY;
-
-  _server->sendToChannel(targetChannel, ":" + _nick + "!~" + _user + "@" +
-                                            _hostname + " JOIN " + target);
 }
 
 void Client::part(const std::vector<std::string> &msg) {
@@ -296,24 +301,26 @@ void Client::part(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
-  const std::string &target = msg[1];
-
-  // TODO: multiple channels
-  Channel *channel = findChannel(_server->getChannels(), target);
-  if (channel == NULL) {
-    createMessage(Server::ERR_NOSUCHCHANNEL, target);
-    return;
+  const std::vector<std::string> channels = split(msg[1], ',');
+  for (std::vector<std::string>::const_iterator it = channels.begin();
+       it != channels.end(); ++it) {
+    Channel *channel = findChannel(_server->getChannels(), *it);
+    if (channel == NULL) {
+      createMessage(Server::ERR_NOSUCHCHANNEL, *it);
+      continue;
+    }
+    if (findChannel(_channels, *it) == NULL) {
+      createMessage(Server::ERR_NOTONCHANNEL, *it);
+      continue;
+    }
+    // TODO: check default part message
+    const std::string reason =
+        (msg.size() > 2 ? msg[2] : "Client left the channel");
+    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " PART " + *it + " :" +
+                                        reason);
+    removeChannel(*it);
   }
-  if (findChannel(_channels, target) == NULL) {
-    createMessage(Server::ERR_NOTONCHANNEL, target);
-    return;
-  }
-  // TODO: check default part message
-  const std::string reason =
-      (msg.size() > 2 ? msg[2] : "Client left the channel");
-  _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" + _hostname +
-                                      " PART " + target + " :" + reason);
-  removeChannel(target);
 }
 
 void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
