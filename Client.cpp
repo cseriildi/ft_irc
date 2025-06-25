@@ -232,13 +232,13 @@ void Client::join(const std::vector<std::string> &msg) {
   if (*channels.begin() == "0") {
     // TODO: call the broadcast to all channels of the client function with PART
     // TODO: make a remove all channels function
-    std::vector<std::string> channels;
-    channels.push_back("PART");
+    std::vector<std::string> command;
+    command.push_back("PART");
     for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
          ++it) {
-      channels.push_back(it->first);
+      command.push_back(it->first);
     }
-    part(channels);
+    part(command);
     return;
   }
   for (std::vector<std::string>::const_iterator it = channels.begin();
