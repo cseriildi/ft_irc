@@ -50,7 +50,7 @@ class Client {
   void privmsg(const std::vector<std::string> &msg);
   void ping(const std::vector<std::string> &msg);
 
-  // Channel comman
+  // Channel commands
   void join(const std::vector<std::string> &msg);
   void part(const std::vector<std::string> &msg);
   void kick(const std::vector<std::string> &msg);
@@ -68,7 +68,6 @@ class Client {
   int getClientFd() const;
   const std::string &getNick() const;
   const std::string &getUser() const;
-  int getMode() const;
   const std::string &getHostname() const;
   const std::string &getRealName() const;
   const std::string &getPassword() const;
@@ -81,10 +80,9 @@ class Client {
 
   static bool isValidName(const std::string &name);
 
-   void removeChannel(const std::string &name);
+  void removeChannel(const std::string &name);
 
  private:
-  // Instance of IRC interpeter, called with a string, returns a string
   Client();
   Client(const Client &other);
   Client &operator=(const Client &other);
@@ -95,12 +93,9 @@ class Client {
   int _clientFd;
   std::string _nick;
   std::string _user;
-  int _mode;  // TODO: check what does this mean: bit 2 - w, bit 3 - i
-              // (https://www.rfc-editor.org/rfc/rfc2812.html#section-3.1.5)
   std::string _hostname;
   std::string _realName;
   std::string _password;
-
   bool _isPassSet;
   bool _isNickSet;
   bool _isUserSet;

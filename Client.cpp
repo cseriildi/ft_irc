@@ -57,7 +57,6 @@ Client::~Client() {}
 
 const std::string &Client::getNick() const { return _nick; }
 const std::string &Client::getUser() const { return _user; }
-int Client::getMode() const { return _mode; }
 const std::string &Client::getHostname() const { return _hostname; }
 const std::string &Client::getRealName() const { return _realName; }
 const std::string &Client::getPassword() const { return _password; }
@@ -221,7 +220,7 @@ void Client::user(const std::vector<std::string> &msg) {
   }
 
   _user = msg[1];
-  _mode = 0;  // TODO: extract mode
+  // mode is usually ignored in irc servers
   _hostname = msg[3];
 
   std::string realname = msg[4];
