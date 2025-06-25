@@ -22,6 +22,21 @@ std::string uppercase(const std::string &str) {
   return result;
 }
 
+std::string lowercase(const std::string &str) {
+  std::string result(str);
+  for (std::string::iterator it = result.begin(); it != result.end(); ++it) {
+    if (*it == '[') {
+      *it = '{';
+    } else if (*it == '\\') {
+      *it = '|';
+    } else if (*it == '~') {
+      *it = '^';
+    }
+    *it = static_cast<char>(std::tolower(*it));
+  }
+  return result;
+}
+
 bool startsWith(const std::string &str, const std::string &prefix) {
   return str.size() >= prefix.size() &&
          uppercase(str).compare(0, prefix.size(), prefix) == 0;
@@ -52,7 +67,7 @@ std::vector<std::string> split(const std::string &line) {
   }
 
   if (found_colon != std::string::npos) {
-    result.push_back(line.substr(found_colon));
+    result.push_back(line.substr(found_colon + 1));
   }
   if (!result.empty()) result[0] = uppercase(result[0]);
 
@@ -68,10 +83,10 @@ Client *findClient(const ClientList &clients, int fd) {
 }
 
 Client *findClient(const ClientList &clients, const std::string &nick) {
+  const std::string l_nick = lowercase(nick);
   for (ClientList::const_iterator it = clients.begin(); it != clients.end();
        ++it) {
-    // TODO: case insensitive comparison
-    if (it->second->getNick() == nick) {
+    if (lowercase(it->second->getNick()) == l_nick) {
       return it->second;
     }
   }
@@ -79,10 +94,12 @@ Client *findClient(const ClientList &clients, const std::string &nick) {
 }
 
 Channel *findChannel(const ChannelList &channels, const std::string &name) {
-  const ChannelList::const_iterator it = channels.find(name);
-  // TODO: case insensitive comparison
-  if (it != channels.end()) {
-    return it->second;
+  const std::string l_name = lowercase(name);
+  for (ChannelList::const_iterator it = channels.begin(); it != channels.end();
+       ++it) {
+    if (lowercase(it->second->getName()) == l_name) {
+      return it->second;
+    }
   }
   return NULL;
 }
