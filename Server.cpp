@@ -30,9 +30,11 @@ const std::map<Server::ERR, std::string> Server::ERRORS = init_error_map();
 std::map<Server::ERR, std::string> Server::init_error_map() {
   std::map<ERR, std::string> errorMap;
   errorMap[ERR_NOSUCHNICK] = "No such nick/channel";
+  errorMap[ERR_NOSUCHSERVER] = "No such server";
   errorMap[ERR_NOSUCHCHANNEL] = "No such channel";
   errorMap[ERR_CANNOTSENDTOCHAN] = "Cannot send to channel";
   errorMap[ERR_TOOMANYTARGETS] = "Duplicate recipients. No message delivered";
+  errorMap[ERR_NOORIGIN] = "No origin specified";
   errorMap[ERR_NORECIPIENT] = "No recipient given";
   errorMap[ERR_NOTEXTTOSEND] = "No text to send";
   errorMap[ERR_NOTOPLEVEL] = "No toplevel domain specified";
@@ -57,7 +59,6 @@ std::map<Server::ERR, std::string> Server::init_error_map() {
   errorMap[ERR_CHANOPRIVSNEEDED] = "You're not channel operator";
   errorMap[ERR_UMODEUNKNOWNFLAG] = "Unknown mode flag";
   errorMap[ERR_USERSDONTMATCH] = "Cannot change mode for other users";
-  // TODO: Add more error codes as needed
   return errorMap;
 }
 

@@ -51,9 +51,11 @@ class Server {
 
   enum ERR {
     ERR_NOSUCHNICK = 401,
+    ERR_NOSUCHSERVER = 402,
     ERR_NOSUCHCHANNEL = 403,
     ERR_CANNOTSENDTOCHAN = 404,
     ERR_TOOMANYTARGETS = 407,
+    ERR_NOORIGIN = 409,
     ERR_NORECIPIENT = 411,
     ERR_NOTEXTTOSEND = 412,
     ERR_NOTOPLEVEL = 413,
@@ -74,8 +76,8 @@ class Server {
     ERR_CHANNELISFULL = 471,
     ERR_UNKNOWNMODE = 472,
     ERR_INVITEONLYCHAN = 473,
-    ERR_BADCHANNELKEY =
-        475,  // TODO: check what if a client gets kicked from a channel
+    ERR_BADCHANNELKEY = 475,
+    // TODO: check what if a client gets kicked from a channel
     ERR_CHANOPRIVSNEEDED = 482,
     ERR_UMODEUNKNOWNFLAG = 501,
     ERR_USERSDONTMATCH = 502
