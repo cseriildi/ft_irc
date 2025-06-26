@@ -332,11 +332,12 @@ void Client::join(const std::vector<std::string> &msg) {
     // the list of users who are on the channel (using RPL_NAMREPLY), which
     // MUST include the user joining.
 
-    // TODO: send confirmation to client
-    // RPL_TOPIC;
-
     _server->sendToChannel(targetChannel, ":" + _nick + "!~" + _user + "@" +
                                               _hostname + " JOIN " + name);
+    if (targetChannel->isTopicSet()) {
+      createMessage(Server::RPL_TOPIC, targetChannel);
+    }
+
     createMessage(Server::RPL_NAMREPLY, targetChannel);
     createMessage(Server::RPL_ENDOFNAMES, targetChannel);
   }
@@ -372,7 +373,40 @@ void Client::part(const std::vector<std::string> &msg) {
 
 void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
 void Client::invite(const std::vector<std::string> &msg) { (void)msg; }
-void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
+
+void Client::topic(const std::vector<std::string> &msg) {
+  if (msg.size() < 2 || msg[1].empty()) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  const std::string &target = msg[1];
+  Channel *channel = findChannel(_server->getChannels(), target);
+  if (channel == NULL) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, target);
+    return;
+  }
+  if (findChannel(_channels, target) == NULL) {
+    createMessage(Server::ERR_NOTONCHANNEL, target);
+    return;
+  }
+  if (msg.size() > 2) {
+    if (findClient(channel->getOperators(), _clientFd) == NULL) {
+      createMessage(Server::ERR_CHANOPRIVSNEEDED, target);
+      return;
+    }
+    channel->setTopic(msg[2]);
+    channel->setTopicSet(true);
+    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " TOPIC " + target + " :" +
+                                        channel->getTopic());
+  }
+  if (!channel->isTopicSet()) {
+    createMessage(Server::RPL_NOTOPIC, channel);
+  } else {
+    createMessage(Server::RPL_TOPIC, channel);
+  }
+}
+
 
 void Client::mode(const std::vector<std::string> &msg) {
   if (msg.size() < 2 || msg[1].empty()) {
