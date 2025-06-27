@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>  // for send, recv
 
+#include <ctime>
 #include <map>
 #include <string>
 #include <vector>
@@ -58,6 +59,7 @@ class Client {
   const std::string &getHostname() const;
   const std::string &getRealName() const;
   const std::string &getPassword() const;
+  time_t getJoinedAt() const;
   bool isPassSet() const;
   bool isNickSet() const;
   bool isUserSet() const;
@@ -95,6 +97,7 @@ class Client {
   std::string _hostname;
   std::string _realName;
   std::string _password;
+  time_t _joinedAt;
   bool _isPassSet;
   bool _isNickSet;
   bool _isUserSet;
