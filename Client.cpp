@@ -49,6 +49,7 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
 
 Client::Client(int sockfd, Server *server)
     : _clientFd(sockfd),
+      _joinedAt(0),
       _isPassSet(false),
       _isNickSet(false),
       _isUserSet(false),
@@ -65,6 +66,7 @@ const std::string &Client::getUser() const { return _user; }
 const std::string &Client::getHostname() const { return _hostname; }
 const std::string &Client::getRealName() const { return _realName; }
 const std::string &Client::getPassword() const { return _password; }
+time_t Client::getJoinedAt() const { return _joinedAt; }
 bool Client::isPassSet() const { return _isPassSet; }
 bool Client::isNickSet() const { return _isNickSet; }
 bool Client::isUserSet() const { return _isUserSet; }
@@ -350,6 +352,7 @@ void Client::_authenticate() {
     createMessage(Server::ERR_PASSWDMISMATCH);
     return;
   }
+  _joinedAt = time(NULL);
   _isAuthenticated = true;
   createMessage(Server::RPL_WELCOME);
   createMessage(Server::RPL_YOURHOST);
@@ -496,12 +499,12 @@ void Client::createMessage(RPL response_code, Client *targetClient) {
     }
   } else if (response_code == Server::RPL_WHOISSERVER) {
     ss << _server->getName() << " :ft_irc server";
-  } else if (response_code == Server::RPL_ENDOFWHOIS) {
-    ss << ":End of WHOIS list";
-    _server->sendToClient(this, ss.str());
+  } else if (response_code == Server::RPL_WHOISIDLE) {
+    ss << (time(NULL) - targetClient->getJoinedAt()) << " :seconds idle";
   } else {
     ss << ":Unknown response code";
   }
+  _server->sendToClient(this, ss.str());
 }
 
 void Client::createMessage(RPL response_code, Channel *targetChannel) {
