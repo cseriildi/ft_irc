@@ -88,9 +88,7 @@ void Channel::removeOperator(int clientFd) {
 }
 
 bool Channel::isValidName(const std::string &name) {
-  if (name.empty() || name[0] != '#') {
-    return false;
-  }
-  // TODO: more checks
-  return true;
+  return !name.empty() && name[0] == '#' && name.length() <= 50 &&
+         name.find_first_of(" ,:") == std::string::npos &&
+         name.find('\a') == std::string::npos;
 }
