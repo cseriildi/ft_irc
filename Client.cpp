@@ -203,7 +203,7 @@ void Client::quit(const std::vector<std::string> &msg) {
 
 void Client::whois(const std::vector<std::string> &msg) {
   if (msg.size() < 2 || msg[1].empty()) {
-    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    createMessage(Server::ERR_NONICKNAMEGIVEN);
     return;
   }
   const std::string &target = msg[1];
@@ -214,9 +214,11 @@ void Client::whois(const std::vector<std::string> &msg) {
     return;
   }
   createMessage(Server::RPL_WHOISUSER, targetClient);
-  createMessage(Server::RPL_WHOISCHANNELS, targetClient);
-  createMessage(Server::RPL_WHOISIDLE, targetClient);
+  if (!_channels.empty()) {
+    createMessage(Server::RPL_WHOISCHANNELS, targetClient);
+  }
   createMessage(Server::RPL_WHOISSERVER, targetClient);
+  createMessage(Server::RPL_WHOISIDLE, targetClient);
   createMessage(Server::RPL_ENDOFWHOIS);
 }
 
@@ -468,6 +470,8 @@ void Client::createMessage(RPL response_code) {
     ss << ":End of LIST";
   } else if (response_code == Server::RPL_TIME) {
     ss << _server->getName() << " :" << get_time(_server->getCreatedAt());
+  } else if (response_code == Server::RPL_ENDOFWHOIS) {
+    ss << ":End of WHOIS list";
   } else {
     ss << ":Unknown response code";
   }
@@ -480,7 +484,7 @@ void Client::createMessage(RPL response_code, Client *targetClient) {
      << targetClient->getNick() << " ";
   if (response_code == Server::RPL_WHOISUSER) {
     ss << "~" << targetClient->getUser() << " " << targetClient->getHostname()
-       << "* :" << targetClient->getRealName();
+       << " * :" << targetClient->getRealName();
   } else if (response_code == Server::RPL_WHOISCHANNELS) {
     ss << ":";
     const ChannelList &channels = targetClient->getChannels();
