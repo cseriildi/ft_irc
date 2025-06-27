@@ -446,19 +446,6 @@ void Client::createMessage(RPL response_code) {
   } else if (response_code == Server::RPL_MYINFO) {
     ss << _server->getName() << " 1.0 "
        << "available user modes, available channel modes";  // TODO
-  } else if (response_code == Server::RPL_LUSERCLIENT) {
-    ss << ":There are " << _server->getClients().size()
-       << " users and 0 invisible on this server";
-    // TODO: check what's invisible
-  } else if (response_code == Server::RPL_LUSEROP) {
-    ss << ":There are 0 operators online";
-    // TODO: check what's operator on a server
-  } else if (response_code == Server::RPL_LUSERUNKNOWN) {
-    ss << ":There are 0 unknown connections";  // TODO: check what's unknown
-  } else if (response_code == Server::RPL_LUSERCHANNELS) {
-    ss << ":There are " << _server->getChannels().size() << " channels created";
-  } else if (response_code == Server::RPL_LUSERME) {
-    ss << ":I have a total of " << _server->getClients().size() << " clients";
   } else if (response_code == Server::RPL_LISTEND) {
     ss << ":End of LIST";
   } else if (response_code == Server::RPL_TIME) {
