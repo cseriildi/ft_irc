@@ -49,6 +49,7 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
 
 Client::Client(int sockfd, Server *server)
     : _clientFd(sockfd),
+      _joinedAt(0),
       _isPassSet(false),
       _isNickSet(false),
       _isUserSet(false),
@@ -65,6 +66,7 @@ const std::string &Client::getUser() const { return _user; }
 const std::string &Client::getHostname() const { return _hostname; }
 const std::string &Client::getRealName() const { return _realName; }
 const std::string &Client::getPassword() const { return _password; }
+time_t Client::getJoinedAt() const { return _joinedAt; }
 bool Client::isPassSet() const { return _isPassSet; }
 bool Client::isNickSet() const { return _isNickSet; }
 bool Client::isUserSet() const { return _isUserSet; }
@@ -80,8 +82,6 @@ void Client::handle(const std::string &msg) {
 #ifdef DEBUG
   std::cout << "< Received: " << msg << '\n';
 #endif
-
-  // TODO: think about leading spaces
   std::vector<std::string> parsed = parse(msg);
 
   if (parsed.empty()) {
@@ -116,16 +116,11 @@ void Client::pass(const std::vector<std::string> &msg) {
 }
 
 void Client::nick(const std::vector<std::string> &msg) {
-  if (msg.size() < 2) {
-    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+  if (msg.size() < 2 || msg[1].empty()) {
+    createMessage(Server::ERR_NONICKNAMEGIVEN, msg[0]);
     return;
   }
   const std::string &nick = msg[1];
-
-  if (nick.empty()) {
-    createMessage(Server::ERR_NONICKNAMEGIVEN);
-    return;
-  }
   if (nick.find(' ') != std::string::npos) {
     createMessage(Server::ERR_ERRONEUSNICKNAME, nick);
     return;
@@ -201,7 +196,7 @@ void Client::quit(const std::vector<std::string> &msg) {
 
 void Client::whois(const std::vector<std::string> &msg) {
   if (msg.size() < 2 || msg[1].empty()) {
-    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    createMessage(Server::ERR_NONICKNAMEGIVEN);
     return;
   }
   const std::string &target = msg[1];
@@ -212,9 +207,11 @@ void Client::whois(const std::vector<std::string> &msg) {
     return;
   }
   createMessage(Server::RPL_WHOISUSER, targetClient);
-  createMessage(Server::RPL_WHOISCHANNELS, targetClient);
-  createMessage(Server::RPL_WHOISIDLE, targetClient);
+  if (!_channels.empty()) {
+    createMessage(Server::RPL_WHOISCHANNELS, targetClient);
+  }
   createMessage(Server::RPL_WHOISSERVER, targetClient);
+  createMessage(Server::RPL_WHOISIDLE, targetClient);
   createMessage(Server::RPL_ENDOFWHOIS);
 }
 
@@ -243,45 +240,44 @@ void Client::join(const std::vector<std::string> &msg) {
   }
   for (std::vector<std::string>::const_iterator it = channels.begin();
        it != channels.end(); ++it) {
-    if (!Channel::isValidName(*it)) {
-      createMessage(Server::ERR_NOSUCHCHANNEL, *it);
-      // TODO: make sure this is the right error code
+    const std::string &name = *it;
+    if (!Channel::isValidName(name)) {
+      createMessage(Server::ERR_NOSUCHCHANNEL, name);
       continue;
     }
 
-    Channel *targetChannel = findChannel(_server->getChannels(), *it);
+    Channel *targetChannel = findChannel(_server->getChannels(), name);
     if (targetChannel == NULL) {
-      targetChannel = new Channel(*it, _server);
+      targetChannel = new Channel(name, _server);
       _server->addChannel(targetChannel);
-    } else if (findChannel(_channels, *it) != NULL) {
+    } else if (findChannel(_channels, name) != NULL) {
       continue;  // Already in the channel
     }
     if (targetChannel->isInviteOnly() &&
         findClient(targetChannel->getInvited(), _clientFd) == NULL) {
-      createMessage(Server::ERR_INVITEONLYCHAN, *it);
+      createMessage(Server::ERR_INVITEONLYCHAN, name);
       continue;
     }
     if (targetChannel->isLimited() &&
         targetChannel->getClients().size() >= targetChannel->getLimit()) {
-      createMessage(Server::ERR_CHANNELISFULL, *it);
+      createMessage(Server::ERR_CHANNELISFULL, name);
       continue;
     }
     if (targetChannel->isPassRequired()) {
       size_t const index = std::distance(channels.begin(), it);
       if (index >= keys.size()) {
-        // TODO: check if this is the right error code
-        createMessage(Server::ERR_PASSWDMISMATCH, *it);
+        createMessage(Server::ERR_BADCHANNELKEY, name);
         continue;
       }
       const std::string &pass = keys[index];
       if (pass != targetChannel->getPassword()) {
-        createMessage(Server::ERR_PASSWDMISMATCH, pass);
+        createMessage(Server::ERR_BADCHANNELKEY, name);
         continue;
       }
     }
     // TODO: check the channel limit for user ERR_TOOMANYCHANNELS
     targetChannel->addClient(this);
-    _channels[*it] = targetChannel;
+    _channels[name] = targetChannel;
     // If a JOIN is successful, the user receives a JOIN message as
     // confirmation and is then sent the channel's topic (using RPL_TOPIC) and
     // the list of users who are on the channel (using RPL_NAMREPLY), which
@@ -292,7 +288,7 @@ void Client::join(const std::vector<std::string> &msg) {
     // RPL_NAMREPLY;
 
     _server->sendToChannel(targetChannel, ":" + _nick + "!~" + _user + "@" +
-                                              _hostname + " JOIN " + *it);
+                                              _hostname + " JOIN " + name);
   }
 }
 
@@ -304,22 +300,23 @@ void Client::part(const std::vector<std::string> &msg) {
   const std::vector<std::string> channels = split(msg[1], ',');
   for (std::vector<std::string>::const_iterator it = channels.begin();
        it != channels.end(); ++it) {
-    Channel *channel = findChannel(_server->getChannels(), *it);
+    const std::string &name = *it;
+    Channel *channel = findChannel(_server->getChannels(), name);
     if (channel == NULL) {
-      createMessage(Server::ERR_NOSUCHCHANNEL, *it);
+      createMessage(Server::ERR_NOSUCHCHANNEL, name);
       continue;
     }
-    if (findChannel(_channels, *it) == NULL) {
-      createMessage(Server::ERR_NOTONCHANNEL, *it);
+    if (findChannel(_channels, name) == NULL) {
+      createMessage(Server::ERR_NOTONCHANNEL, name);
       continue;
     }
     // TODO: check default part message
     const std::string reason =
         (msg.size() > 2 ? msg[2] : "Client left the channel");
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
-                                        _hostname + " PART " + *it + " :" +
+                                        _hostname + " PART " + name + " :" +
                                         reason);
-    removeChannel(*it);
+    removeChannel(name);
   }
 }
 
@@ -371,6 +368,7 @@ void Client::_authenticate() {
     createMessage(Server::ERR_PASSWDMISMATCH);
     return;
   }
+  _joinedAt = time(NULL);
   _isAuthenticated = true;
   createMessage(Server::RPL_WELCOME);
   createMessage(Server::RPL_YOURHOST);
@@ -469,23 +467,12 @@ void Client::createMessage(RPL response_code) {
   } else if (response_code == Server::RPL_MYINFO) {
     ss << _server->getName() << " 1.0 "
        << "available user modes, available channel modes";  // TODO
-  } else if (response_code == Server::RPL_LUSERCLIENT) {
-    ss << ":There are " << _server->getClients().size()
-       << " users and 0 invisible on this server";
-    // TODO: check what's invisible
-  } else if (response_code == Server::RPL_LUSEROP) {
-    ss << ":There are 0 operators online";
-    // TODO: check what's operator on a server
-  } else if (response_code == Server::RPL_LUSERUNKNOWN) {
-    ss << ":There are 0 unknown connections";  // TODO: check what's unknown
-  } else if (response_code == Server::RPL_LUSERCHANNELS) {
-    ss << ":There are " << _server->getChannels().size() << " channels created";
-  } else if (response_code == Server::RPL_LUSERME) {
-    ss << ":I have a total of " << _server->getClients().size() << " clients";
   } else if (response_code == Server::RPL_LISTEND) {
     ss << ":End of LIST";
   } else if (response_code == Server::RPL_TIME) {
     ss << _server->getName() << " :" << get_time(_server->getCreatedAt());
+  } else if (response_code == Server::RPL_ENDOFWHOIS) {
+    ss << ":End of WHOIS list";
   } else {
     ss << ":Unknown response code";
   }
@@ -498,7 +485,7 @@ void Client::createMessage(RPL response_code, Client *targetClient) {
      << targetClient->getNick() << " ";
   if (response_code == Server::RPL_WHOISUSER) {
     ss << "~" << targetClient->getUser() << " " << targetClient->getHostname()
-       << "* :" << targetClient->getRealName();
+       << " * :" << targetClient->getRealName();
   } else if (response_code == Server::RPL_WHOISCHANNELS) {
     ss << ":";
     const ChannelList &channels = targetClient->getChannels();
@@ -517,12 +504,12 @@ void Client::createMessage(RPL response_code, Client *targetClient) {
     }
   } else if (response_code == Server::RPL_WHOISSERVER) {
     ss << _server->getName() << " :ft_irc server";
-  } else if (response_code == Server::RPL_ENDOFWHOIS) {
-    ss << ":End of WHOIS list";
-    _server->sendToClient(this, ss.str());
+  } else if (response_code == Server::RPL_WHOISIDLE) {
+    ss << (time(NULL) - targetClient->getJoinedAt()) << " :seconds idle";
   } else {
     ss << ":Unknown response code";
   }
+  _server->sendToClient(this, ss.str());
 }
 
 void Client::createMessage(RPL response_code, Channel *targetChannel) {

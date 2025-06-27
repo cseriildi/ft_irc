@@ -39,7 +39,6 @@ std::map<Server::ERR, std::string> Server::init_error_map() {
   errorMap[ERR_NOTEXTTOSEND] = "No text to send";
   errorMap[ERR_NOTOPLEVEL] = "No toplevel domain specified";
   errorMap[ERR_WILDTOPLEVEL] = "Wildcard in toplevel domain";
-  errorMap[ERR_BADMASK] = "Bad server mask";
   errorMap[ERR_UNKNOWNCOMMAND] = "Unknown command";
   errorMap[ERR_NONICKNAMEGIVEN] = "No nickname given";
   errorMap[ERR_ERRONEUSNICKNAME] = "Erroneous nickname";
@@ -57,8 +56,6 @@ std::map<Server::ERR, std::string> Server::init_error_map() {
   errorMap[ERR_INVITEONLYCHAN] = "Cannot join channel (+i)";
   errorMap[ERR_BADCHANNELKEY] = "Cannot join channel (+k)";
   errorMap[ERR_CHANOPRIVSNEEDED] = "You're not channel operator";
-  errorMap[ERR_UMODEUNKNOWNFLAG] = "Unknown mode flag";
-  errorMap[ERR_USERSDONTMATCH] = "Cannot change mode for other users";
   return errorMap;
 }
 
