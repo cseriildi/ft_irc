@@ -57,10 +57,10 @@ void Channel::addClient(Client *client) {
   if (client == NULL) {
     return;
   }
-  _clients[client->getClientFd()] = client;
-  if (_operators.empty()) {
+  if (_clients.empty()) {
     _operators[client->getClientFd()] = client;
   }
+  _clients[client->getClientFd()] = client;
   if (_isInviteOnly) {
     _invited.erase(client->getClientFd());
   }
@@ -72,7 +72,6 @@ void Channel::removeClient(int clientFd) {
     _clients.erase(it);
   }
   removeOperator(clientFd);
-  // broadcast to channel that client has left
 }
 
 void Channel::addOperator(Client *client) {
@@ -85,10 +84,6 @@ void Channel::addOperator(Client *client) {
 void Channel::removeOperator(int clientFd) {
   if (findClient(_operators, clientFd) != NULL) {
     _operators.erase(clientFd);
-  }
-  if (_operators.empty() && !_clients.empty()) {
-    addOperator(_clients.begin()->second);
-    // Not sure this is the right user to promote to operator
   }
 }
 
