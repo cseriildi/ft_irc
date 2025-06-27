@@ -247,45 +247,44 @@ void Client::join(const std::vector<std::string> &msg) {
   }
   for (std::vector<std::string>::const_iterator it = channels.begin();
        it != channels.end(); ++it) {
-    if (!Channel::isValidName(*it)) {
-      createMessage(Server::ERR_NOSUCHCHANNEL, *it);
-      // TODO: make sure this is the right error code
+    const std::string &name = *it;
+    if (!Channel::isValidName(name)) {
+      createMessage(Server::ERR_NOSUCHCHANNEL, name);
       continue;
     }
 
-    Channel *targetChannel = findChannel(_server->getChannels(), *it);
+    Channel *targetChannel = findChannel(_server->getChannels(), name);
     if (targetChannel == NULL) {
-      targetChannel = new Channel(*it, _server);
+      targetChannel = new Channel(name, _server);
       _server->addChannel(targetChannel);
-    } else if (findChannel(_channels, *it) != NULL) {
+    } else if (findChannel(_channels, name) != NULL) {
       continue;  // Already in the channel
     }
     if (targetChannel->isInviteOnly() &&
         findClient(targetChannel->getInvited(), _clientFd) == NULL) {
-      createMessage(Server::ERR_INVITEONLYCHAN, *it);
+      createMessage(Server::ERR_INVITEONLYCHAN, name);
       continue;
     }
     if (targetChannel->isLimited() &&
         targetChannel->getClients().size() >= targetChannel->getLimit()) {
-      createMessage(Server::ERR_CHANNELISFULL, *it);
+      createMessage(Server::ERR_CHANNELISFULL, name);
       continue;
     }
     if (targetChannel->isPassRequired()) {
       size_t const index = std::distance(channels.begin(), it);
       if (index >= keys.size()) {
-        // TODO: check if this is the right error code
-        createMessage(Server::ERR_PASSWDMISMATCH, *it);
+        createMessage(Server::ERR_BADCHANNELKEY, name);
         continue;
       }
       const std::string &pass = keys[index];
       if (pass != targetChannel->getPassword()) {
-        createMessage(Server::ERR_PASSWDMISMATCH, pass);
+        createMessage(Server::ERR_BADCHANNELKEY, name);
         continue;
       }
     }
     // TODO: check the channel limit for user ERR_TOOMANYCHANNELS
     targetChannel->addClient(this);
-    _channels[*it] = targetChannel;
+    _channels[name] = targetChannel;
     // If a JOIN is successful, the user receives a JOIN message as
     // confirmation and is then sent the channel's topic (using RPL_TOPIC) and
     // the list of users who are on the channel (using RPL_NAMREPLY), which
@@ -296,7 +295,7 @@ void Client::join(const std::vector<std::string> &msg) {
     // RPL_NAMREPLY;
 
     _server->sendToChannel(targetChannel, ":" + _nick + "!~" + _user + "@" +
-                                              _hostname + " JOIN " + *it);
+                                              _hostname + " JOIN " + name);
   }
 }
 
@@ -308,22 +307,23 @@ void Client::part(const std::vector<std::string> &msg) {
   const std::vector<std::string> channels = split(msg[1], ',');
   for (std::vector<std::string>::const_iterator it = channels.begin();
        it != channels.end(); ++it) {
-    Channel *channel = findChannel(_server->getChannels(), *it);
+    const std::string &name = *it;
+    Channel *channel = findChannel(_server->getChannels(), name);
     if (channel == NULL) {
-      createMessage(Server::ERR_NOSUCHCHANNEL, *it);
+      createMessage(Server::ERR_NOSUCHCHANNEL, name);
       continue;
     }
-    if (findChannel(_channels, *it) == NULL) {
-      createMessage(Server::ERR_NOTONCHANNEL, *it);
+    if (findChannel(_channels, name) == NULL) {
+      createMessage(Server::ERR_NOTONCHANNEL, name);
       continue;
     }
     // TODO: check default part message
     const std::string reason =
         (msg.size() > 2 ? msg[2] : "Client left the channel");
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
-                                        _hostname + " PART " + *it + " :" +
+                                        _hostname + " PART " + name + " :" +
                                         reason);
-    removeChannel(*it);
+    removeChannel(name);
   }
 }
 
