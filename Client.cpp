@@ -82,8 +82,6 @@ void Client::handle(const std::string &msg) {
 #ifdef DEBUG
   std::cout << "< Received: " << msg << '\n';
 #endif
-
-  // TODO: think about leading spaces
   std::vector<std::string> parsed = parse(msg);
 
   if (parsed.empty()) {
@@ -118,16 +116,11 @@ void Client::pass(const std::vector<std::string> &msg) {
 }
 
 void Client::nick(const std::vector<std::string> &msg) {
-  if (msg.size() < 2) {
-    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+  if (msg.size() < 2 || msg[1].empty()) {
+    createMessage(Server::ERR_NONICKNAMEGIVEN, msg[0]);
     return;
   }
   const std::string &nick = msg[1];
-
-  if (nick.empty()) {
-    createMessage(Server::ERR_NONICKNAMEGIVEN);
-    return;
-  }
   if (nick.find(' ') != std::string::npos) {
     createMessage(Server::ERR_ERRONEUSNICKNAME, nick);
     return;
