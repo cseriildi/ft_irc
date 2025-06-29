@@ -390,7 +390,8 @@ void Client::topic(const std::vector<std::string> &msg) {
     return;
   }
   if (msg.size() > 2) {
-    if (findClient(channel->getOperators(), _clientFd) == NULL) {
+    if (channel->isTopicOperOnly() &&
+        findClient(channel->getOperators(), _clientFd) == NULL) {
       createMessage(Server::ERR_CHANOPRIVSNEEDED, target);
       return;
     }
