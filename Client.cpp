@@ -323,7 +323,37 @@ void Client::part(const std::vector<std::string> &msg) {
 void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
 void Client::invite(const std::vector<std::string> &msg) { (void)msg; }
 void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
-void Client::mode(const std::vector<std::string> &msg) { (void)msg; }
+
+void Client::mode(const std::vector<std::string> &msg) {
+  if (msg.size() < 2 || msg[1].empty()) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  const std::string &target = msg[1];
+  Channel *channel = findChannel(_server->getChannels(), target);
+  if (channel == NULL) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, target);
+    return;
+  }
+  if (msg.size() < 3 || msg[2].empty()) {
+    createMessage(Server::RPL_CHANNELMODEIS, channel);
+    return;
+  }
+  // TODO: handle modes
+  // itklo +- (if no sign then +) max 3per command
+  const std::string &modes = msg[2];
+  const size_t c = modes.find_first_not_of("+-itklo");
+  if (c != std::string::npos) {
+    createMessage(Server::ERR_UNKNOWNMODE, modes.substr(c, 1));  // TODO
+    return;
+  }
+  // ko  and l in setting mode needs another parameter
+  // if multiple of the same, the last one overrides the previous one
+  // bool setting = true;
+  // int modeCount = 0;
+  // first we have to check if we have enough parameters for the modes
+}
+
 void Client::names(const std::vector<std::string> &msg) { (void)msg; }
 void Client::list(const std::vector<std::string> &msg) { (void)msg; }
 // send RPL_LIST for each channel and then RPL_LISTEND
@@ -505,6 +535,8 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
        << targetChannel->getTopic();
   } else if (response_code == Server::RPL_CHANNELMODEIS) {
     // ss << targetChannel->getMode(); TODO
+    // TODO: if client is not on channel don't send pass and limit only the
+    // modes
   } else if (response_code == Server::RPL_NOTOPIC) {
     ss << ":No topic is set";
   } else if (response_code == Server::RPL_TOPIC) {

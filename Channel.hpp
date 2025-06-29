@@ -28,6 +28,7 @@ class Channel {
   std::string getTopic() const;
   std::string getPassword() const;
   bool isInviteOnly() const;
+  bool isTopicOperOnly() const;
   bool isTopicSet() const;
   bool isPassRequired() const;
   std::string getPass() const;
@@ -58,6 +59,7 @@ class Channel {
   std::string _topic;
   std::string _password;
   bool _isInviteOnly;
+  bool _topicOperOnly;
   bool _topicSet;
   bool _passRequired;
   std::string _pass;
