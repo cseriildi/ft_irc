@@ -521,8 +521,7 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
      << targetChannel->getName() << " ";
 
   if (response_code == Server::RPL_LIST) {
-    ss << ":" << targetChannel->getName() << " "
-       << targetChannel->getClients().size() << " :"
+    ss << targetChannel->getClients().size() << " :"
        << targetChannel->getTopic();
   } else if (response_code == Server::RPL_CHANNELMODEIS) {
     // ss << targetChannel->getMode(); TODO
