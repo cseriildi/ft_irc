@@ -11,6 +11,7 @@
 Channel::Channel(const std::string &name, Server *server)
     : _name(name),
       _isInviteOnly(false),
+      _topicOperOnly(false),
       _topicSet(false),
       _passRequired(false),
       _isLimited(false),
@@ -24,6 +25,7 @@ ClientList Channel::getOperators() const { return _operators; }
 ClientList Channel::getInvited() const { return _invited; }
 std::string Channel::getName() const { return _name; }
 bool Channel::isInviteOnly() const { return _isInviteOnly; }
+bool Channel::isTopicOperOnly() const { return _topicOperOnly; }
 bool Channel::isTopicSet() const { return _topicSet; }
 bool Channel::isPassRequired() const { return _passRequired; }
 bool Channel::isLimited() const { return _isLimited; }
