@@ -285,10 +285,11 @@ void Client::join(const std::vector<std::string> &msg) {
 
     // TODO: send confirmation to client
     // RPL_TOPIC;
-    // RPL_NAMREPLY;
 
     _server->sendToChannel(targetChannel, ":" + _nick + "!~" + _user + "@" +
                                               _hostname + " JOIN " + name);
+    createMessage(Server::RPL_NAMREPLY, targetChannel);
+    createMessage(Server::RPL_ENDOFNAMES, targetChannel);
   }
 }
 
@@ -324,7 +325,33 @@ void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
 void Client::invite(const std::vector<std::string> &msg) { (void)msg; }
 void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
 void Client::mode(const std::vector<std::string> &msg) { (void)msg; }
-void Client::names(const std::vector<std::string> &msg) { (void)msg; }
+
+void Client::names(const std::vector<std::string> &msg) {
+  if (msg.size() > 2 && msg[2] != _server->getName()) {
+    createMessage(Server::ERR_NOSUCHSERVER, msg[2]);
+    return;
+  }
+  if (msg.size() == 1) {
+    for (ChannelList::const_iterator it = _server->getChannels().begin();
+         it != _server->getChannels().end(); ++it) {
+      createMessage(Server::RPL_NAMREPLY, it->second);
+    }
+    /* TODO: At the end of this list, a list of users who
+       are visible but either not on any channel or not on a visible channel
+       are listed as being on `channel' "*". */
+  } else {
+    std::vector<std::string> channels = split(msg[1], ',');
+    for (std::vector<std::string>::const_iterator it = channels.begin();
+         it != channels.end(); ++it) {
+      Channel *channel = findChannel(_server->getChannels(), *it);
+      if (channel != NULL) {
+        createMessage(Server::RPL_NAMREPLY, channel);
+      }
+    }
+  }
+  createMessage(Server::RPL_ENDOFNAMES);
+}
+
 void Client::list(const std::vector<std::string> &msg) { (void)msg; }
 // send RPL_LIST for each channel and then RPL_LISTEND
 
@@ -452,6 +479,8 @@ void Client::createMessage(RPL response_code) {
     ss << _server->getName() << " :" << get_time(_server->getCreatedAt());
   } else if (response_code == Server::RPL_ENDOFWHOIS) {
     ss << ":End of WHOIS list";
+  } else if (response_code == Server::RPL_ENDOFNAMES) {
+    ss << ":End of NAMES list";
   } else {
     ss << ":Unknown response code";
   }
@@ -496,21 +525,38 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
     return;
   }
   std::stringstream ss;
-  ss << ":" << _server->getName() << " " << response_code << " " << _nick << " "
-     << targetChannel->getName() << " ";
+  ss << ":" << _server->getName() << " " << response_code << " " << _nick
+     << " ";
 
   if (response_code == Server::RPL_LIST) {
-    ss << ":" << targetChannel->getName() << " "
-       << targetChannel->getClients().size() << " :"
-       << targetChannel->getTopic();
+    ss << targetChannel->getName() << " " << targetChannel->getClients().size()
+       << " :" << targetChannel->getTopic();
   } else if (response_code == Server::RPL_CHANNELMODEIS) {
-    // ss << targetChannel->getMode(); TODO
+    // ss << targetChannel->getName() << " :" << targetChannel->getMode(); TODO
   } else if (response_code == Server::RPL_NOTOPIC) {
-    ss << ":No topic is set";
+    ss << targetChannel->getName() << " :No topic is set";
   } else if (response_code == Server::RPL_TOPIC) {
-    ss << ":" << targetChannel->getTopic();
+    ss << targetChannel->getName() << " :" << targetChannel->getTopic();
+  } else if (response_code == Server::RPL_NAMREPLY) {
+    const ClientList &clients = targetChannel->getClients();
+    const ClientList &operators = targetChannel->getOperators();
+    ss << "= " << targetChannel->getName() << " :";  // TODO check channel types
+    for (ClientList::const_iterator it = clients.begin(); it != clients.end();
+         ++it) {
+      if (it != clients.begin()) {
+        ss << " ";
+      }
+      if (findClient(operators, it->first) != NULL) {
+        ss << "@";  // Channel operator
+      }
+      ss << it->second->getNick();
+    }
+  } else if (response_code == Server::RPL_LISTEND) {
+    ss << targetChannel->getName() << " :End of LIST";
+  } else if (response_code == Server::RPL_ENDOFNAMES) {
+    ss << targetChannel->getName() << " :End of NAMES list";
   } else {
-    ss << ":Unknown response code";
+    ss << targetChannel->getName() << " :Unknown response code";
   }
   _server->sendToClient(this, ss.str());
 }
