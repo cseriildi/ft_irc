@@ -326,8 +326,29 @@ void Client::invite(const std::vector<std::string> &msg) { (void)msg; }
 void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
 void Client::mode(const std::vector<std::string> &msg) { (void)msg; }
 void Client::names(const std::vector<std::string> &msg) { (void)msg; }
-void Client::list(const std::vector<std::string> &msg) { (void)msg; }
-// send RPL_LIST for each channel and then RPL_LISTEND
+
+void Client::list(const std::vector<std::string> &msg) {
+  if (msg.size() > 2 && msg[2] != _server->getName()) {
+    createMessage(Server::ERR_NOSUCHSERVER, msg[2]);
+    return;
+  }
+  if (msg.size() == 1) {
+    for (ChannelList::const_iterator it = _server->getChannels().begin();
+         it != _server->getChannels().end(); ++it) {
+      createMessage(Server::RPL_LIST, it->second);
+    }
+  } else {
+    std::vector<std::string> channels = split(msg[1], ',');
+    for (std::vector<std::string>::const_iterator it = channels.begin();
+         it != channels.end(); ++it) {
+      Channel *channel = findChannel(_server->getChannels(), *it);
+      if (channel != NULL) {
+        createMessage(Server::RPL_LIST, channel);
+      }
+    }
+  }
+  createMessage(Server::RPL_LISTEND);
+}
 
 void Client::server_time(const std::vector<std::string> &msg) {
   if (msg.size() > 1 && msg[1] != _server->getName()) {
@@ -509,8 +530,7 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
      << targetChannel->getName() << " ";
 
   if (response_code == Server::RPL_LIST) {
-    ss << ":" << targetChannel->getName() << " "
-       << targetChannel->getClients().size() << " :"
+    ss << targetChannel->getClients().size() << " :"
        << targetChannel->getTopic();
   } else if (response_code == Server::RPL_CHANNELMODEIS) {
     // ss << targetChannel->getMode(); TODO
