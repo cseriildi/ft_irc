@@ -371,7 +371,27 @@ void Client::part(const std::vector<std::string> &msg) {
   }
 }
 
-void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
+void Client::kick(const std::vector<std::string> &msg) {
+  if (msg.size() < 3 || msg[1].empty() || msg[2].empty()) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  const std::vector<std::string> channels = split(msg[1], ',');
+  const std::vector<std::string> clients = split(msg[2], ',');
+  if (channels.size() != clients.size() && channels.size() != 1) {
+    /*  For the message to be syntactically correct, there MUST be
+    either one channel parameter and multiple user parameter, or as many
+    channel parameters as there are user parameters. */
+    // TODO: check error message
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  const std::string reason = (msg.size() > 3 ? msg[3] : "Client kicked");
+  // TODO: check default kick message
+
+  // TODO: check channel, client, loop, kick
+}
+
 
 void Client::invite(const std::vector<std::string> &msg) {
   if (msg.size() < 3 || msg[1].empty() || msg[2].empty()) {
