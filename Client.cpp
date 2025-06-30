@@ -42,6 +42,7 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
   commands["WHO"] = &Client::who;
   commands["WHOIS"] = &Client::whois;
   commands["PRIVMSG"] = &Client::privmsg;
+  commands["TIME"] = &Client::server_time;
   return commands;
 }
 
@@ -349,6 +350,14 @@ void Client::list(const std::vector<std::string> &msg) {
   createMessage(Server::RPL_LISTEND);
 }
 
+void Client::server_time(const std::vector<std::string> &msg) {
+  if (msg.size() > 1 && msg[1] != _server->getName()) {
+    createMessage(Server::ERR_NOSUCHSERVER, msg[1]);
+    return;
+  }
+  createMessage(Server::RPL_TIME);
+}
+
 // * HELPERS *
 
 void Client::removeChannel(const std::string &name) {
@@ -470,7 +479,7 @@ void Client::createMessage(RPL response_code) {
   } else if (response_code == Server::RPL_LISTEND) {
     ss << ":End of LIST";
   } else if (response_code == Server::RPL_TIME) {
-    ss << _server->getName() << " :" << get_time(_server->getCreatedAt());
+    ss << _server->getName() << " :" << get_time(std::time(NULL));
   } else if (response_code == Server::RPL_ENDOFWHOIS) {
     ss << ":End of WHOIS list";
   } else {
