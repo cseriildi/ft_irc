@@ -42,7 +42,6 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
   commands["WHO"] = &Client::who;
   commands["WHOIS"] = &Client::whois;
   commands["PRIVMSG"] = &Client::privmsg;
-  commands["TIME"] = &Client::server_time;
   return commands;
 }
 
@@ -326,9 +325,8 @@ void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
 void Client::invite(const std::vector<std::string> &msg) { (void)msg; }
 void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
 void Client::mode(const std::vector<std::string> &msg) { (void)msg; }
-void Client::names(const std::vector<std::string> &msg) {
-void Client::list(const std::vector<std::string> &msg) {
 
+void Client::names(const std::vector<std::string> &msg) {
   if (msg.size() > 2 && msg[2] != _server->getName()) {
     createMessage(Server::ERR_NOSUCHSERVER, msg[2]);
     return;
@@ -356,14 +354,6 @@ void Client::list(const std::vector<std::string> &msg) {
 
 void Client::list(const std::vector<std::string> &msg) { (void)msg; }
 // send RPL_LIST for each channel and then RPL_LISTEND
-
-void Client::server_time(const std::vector<std::string> &msg) {
-  if (msg.size() > 1 && msg[1] != _server->getName()) {
-    createMessage(Server::ERR_NOSUCHSERVER, msg[1]);
-    return;
-  }
-  createMessage(Server::RPL_TIME);
-}
 
 // * HELPERS *
 
@@ -486,7 +476,7 @@ void Client::createMessage(RPL response_code) {
   } else if (response_code == Server::RPL_LISTEND) {
     ss << ":End of LIST";
   } else if (response_code == Server::RPL_TIME) {
-    ss << _server->getName() << " :" << get_time(std::time(NULL));
+    ss << _server->getName() << " :" << get_time(_server->getCreatedAt());
   } else if (response_code == Server::RPL_ENDOFWHOIS) {
     ss << ":End of WHOIS list";
   } else if (response_code == Server::RPL_ENDOFNAMES) {

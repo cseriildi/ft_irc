@@ -42,7 +42,6 @@ class Client {
   void cap(const std::vector<std::string> &msg);
   void quit(const std::vector<std::string> &msg);
   void list(const std::vector<std::string> &msg);
-  void server_time(const std::vector<std::string> &msg);
 
   // * CHANNEL COMMANDS *
   void join(const std::vector<std::string> &msg);
