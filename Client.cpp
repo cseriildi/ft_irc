@@ -4,6 +4,7 @@
 #include <sys/types.h>
 
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <iomanip>
@@ -332,6 +333,13 @@ void Client::mode(const std::vector<std::string> &msg) {
     return;
   }
   const std::string &target = msg[1];
+
+  Client *targetClient = findClient(_server->getClients(), target);
+  if (targetClient != NULL) {
+    // We don't support user MODE
+    return;
+  }
+
   Channel *channel = findChannel(_server->getChannels(), target);
   if (channel == NULL) {
     createMessage(Server::ERR_NOSUCHCHANNEL, target);
@@ -349,11 +357,72 @@ void Client::mode(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_UNKNOWNMODE, modes.substr(c, 1));  // TODO
     return;
   }
-  // ko  and l in setting mode needs another parameter
-  // if multiple of the same, the last one overrides the previous one
-  // bool setting = true;
-  // int modeCount = 0;
-  // first we have to check if we have enough parameters for the modes
+  if (modes.find_first_of("itklo") == std::string::npos) {
+    return;
+  }
+  if (findClient(channel->getOperators(), _clientFd) == NULL) {
+    createMessage(Server::ERR_CHANOPRIVSNEEDED, target);
+    return;
+  }
+
+  bool setting = true;
+  size_t parameter_count = 0;
+  for (std::string::const_iterator it = modes.begin(); it != modes.end();
+       ++it) {
+    if (*it == '+' || *it == '-') {
+      setting = (*it == '+');
+      continue;
+    }
+    if (*it == 'k' || *it == 'o' || (setting && *it == 'l')) {
+      parameter_count++;
+    }
+  }
+  if (msg.size() < 3 + parameter_count) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  setting = true;
+  size_t index = 3;
+  for (std::string::const_iterator it = modes.begin(); it != modes.end();
+       ++it) {
+    if (*it == '+' || *it == '-') {
+      setting = (*it == '+');
+      continue;
+    }
+    if (*it == 'i') {
+      channel->setInviteOnly(setting);
+    } else if (*it == 't') {
+      channel->setTopicOperOnly(setting);
+    } else if (*it == 'k') {
+      if (setting) {
+        channel->setPassword(msg[index++]);
+      } else {
+        channel->setPassRequired(false);
+      }
+    } else if (*it == 'l') {
+      if (setting) {
+        int limit = std::atoi(msg[index++].c_str());
+        if (limit < 0) {
+          return;
+        }
+        channel->setLimit(limit);
+      } else {
+        channel->setLimited(false);
+      }
+    } else if (*it == 'o') {
+      Client *targetClient = findClient(_server->getClients(), msg[index++]);
+      if (targetClient == NULL) {
+        createMessage(Server::ERR_USERNOTINCHANNEL, msg[index - 1]);
+        continue;
+      }
+      if (setting) {
+        channel->addOperator(targetClient);
+      } else {
+        channel->removeOperator(targetClient->getClientFd());
+      }
+    }
+  }
+  createMessage(Server::RPL_CHANNELMODEIS, channel);
 }
 
 void Client::names(const std::vector<std::string> &msg) {
@@ -590,9 +659,7 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
     ss << targetChannel->getName() << " " << targetChannel->getClients().size()
        << " :" << targetChannel->getTopic();
   } else if (response_code == Server::RPL_CHANNELMODEIS) {
-    // ss << targetChannel->getName() << " :" << targetChannel->getMode(); TODO
-    // TODO: if client is not on channel don't send pass and limit only the
-    // modes
+    ss << targetChannel->getMode(this);
   } else if (response_code == Server::RPL_NOTOPIC) {
     ss << targetChannel->getName() << " :No topic is set";
   } else if (response_code == Server::RPL_TOPIC) {
