@@ -42,6 +42,7 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
   commands["WHO"] = &Client::who;
   commands["WHOIS"] = &Client::whois;
   commands["PRIVMSG"] = &Client::privmsg;
+  commands["TIME"] = &Client::server_time;
   return commands;
 }
 
@@ -352,8 +353,37 @@ void Client::names(const std::vector<std::string> &msg) {
   createMessage(Server::RPL_ENDOFNAMES);
 }
 
-void Client::list(const std::vector<std::string> &msg) { (void)msg; }
-// send RPL_LIST for each channel and then RPL_LISTEND
+
+void Client::list(const std::vector<std::string> &msg) {
+  if (msg.size() > 2 && msg[2] != _server->getName()) {
+    createMessage(Server::ERR_NOSUCHSERVER, msg[2]);
+    return;
+  }
+  if (msg.size() == 1) {
+    for (ChannelList::const_iterator it = _server->getChannels().begin();
+         it != _server->getChannels().end(); ++it) {
+      createMessage(Server::RPL_LIST, it->second);
+    }
+  } else {
+    std::vector<std::string> channels = split(msg[1], ',');
+    for (std::vector<std::string>::const_iterator it = channels.begin();
+         it != channels.end(); ++it) {
+      Channel *channel = findChannel(_server->getChannels(), *it);
+      if (channel != NULL) {
+        createMessage(Server::RPL_LIST, channel);
+      }
+    }
+  }
+  createMessage(Server::RPL_LISTEND);
+}
+
+void Client::server_time(const std::vector<std::string> &msg) {
+  if (msg.size() > 1 && msg[1] != _server->getName()) {
+    createMessage(Server::ERR_NOSUCHSERVER, msg[1]);
+    return;
+  }
+  createMessage(Server::RPL_TIME);
+}
 
 // * HELPERS *
 
@@ -476,7 +506,7 @@ void Client::createMessage(RPL response_code) {
   } else if (response_code == Server::RPL_LISTEND) {
     ss << ":End of LIST";
   } else if (response_code == Server::RPL_TIME) {
-    ss << _server->getName() << " :" << get_time(_server->getCreatedAt());
+    ss << _server->getName() << " :" << get_time(std::time(NULL));
   } else if (response_code == Server::RPL_ENDOFWHOIS) {
     ss << ":End of WHOIS list";
   } else if (response_code == Server::RPL_ENDOFNAMES) {
