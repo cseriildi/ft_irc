@@ -349,8 +349,6 @@ void Client::mode(const std::vector<std::string> &msg) {
     createMessage(Server::RPL_CHANNELMODEIS, channel);
     return;
   }
-  // TODO: handle modes
-  // itklo +- (if no sign then +) max 3per command
   const std::string &modes = msg[2];
   const size_t c = modes.find_first_not_of("+-itklo");
   if (c != std::string::npos) {
