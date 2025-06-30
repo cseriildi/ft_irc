@@ -49,6 +49,7 @@ class Channel {
   void removeClient(int clientFd);
   void addOperator(Client *client);
   void removeOperator(int clientFd);
+  void addInvited(Client *client);
 
   static bool isValidName(const std::string &name);
 

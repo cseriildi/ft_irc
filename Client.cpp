@@ -323,7 +323,47 @@ void Client::part(const std::vector<std::string> &msg) {
 }
 
 void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
-void Client::invite(const std::vector<std::string> &msg) { (void)msg; }
+
+void Client::invite(const std::vector<std::string> &msg) {
+  if (msg.size() < 3 || msg[1].empty() || msg[2].empty()) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  const std::string &nick = msg[1];
+  const std::string &channel = msg[2];
+
+  Client *targetClient = findClient(_server->getClients(), nick);
+  if (targetClient == NULL) {
+    createMessage(Server::ERR_NOSUCHNICK, nick);
+    return;
+  }
+  Channel *targetChannel = findChannel(_server->getChannels(), channel);
+  if (targetChannel == NULL) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, channel);
+    return;
+  }
+  const ClientList clients = targetChannel->getClients();
+  if (findClient(clients, targetClient->getClientFd()) !=
+      NULL) {
+    createMessage(Server::ERR_USERONCHANNEL, nick + " " + channel);
+    return;
+  }
+  if (findClient(clients, _clientFd) == NULL) {
+    createMessage(Server::ERR_NOTONCHANNEL, channel);
+    return;
+  }
+  if (targetChannel->isInviteOnly() &&
+      findClient(targetChannel->getOperators(), _clientFd) == NULL) {
+    createMessage(Server::ERR_CHANOPRIVSNEEDED, channel);
+    return;
+  }
+  targetChannel->addInvited(targetClient);
+  _server->sendToClient(targetClient, ":" + _nick + "!~" + _user + "@" +
+                                          _hostname + " INVITE " + nick + " " +
+                                          channel);
+  createMessage(Server::RPL_INVITING, targetChannel, targetClient);
+}
+
 void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
 
 void Client::mode(const std::vector<std::string> &msg) {

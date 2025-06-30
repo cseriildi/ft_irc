@@ -123,6 +123,13 @@ void Channel::removeOperator(int clientFd) {
   }
 }
 
+void Channel::addInvited(Client *client) {
+  if (client == NULL) {
+    return;
+  }
+  _invited[client->getClientFd()] = client;
+}
+
 bool Channel::isValidName(const std::string &name) {
   return !name.empty() && name[0] == '#' && name.length() <= 50 &&
          name.find_first_of(" ,:") == std::string::npos &&
