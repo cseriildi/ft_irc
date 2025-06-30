@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <map>
+#include <sstream>
 #include <string>
 
 #include "Client.hpp"
@@ -53,6 +54,39 @@ void Channel::setLimited(bool limited) { _isLimited = limited; }
 void Channel::setLimit(size_t limit) {
   _limit = limit;
   _isLimited = true;
+}
+void Channel::setTopicOperOnly(bool topicOperOnly) {
+  _topicOperOnly = topicOperOnly;
+}
+
+std::string Channel::getMode(Client *client) const {
+  std::string mode;
+  if (isInviteOnly()) {
+    mode += "i";
+  }
+  if (isTopicOperOnly()) {
+    mode += "t";
+  }
+  if (isPassRequired()) {
+    mode += "k";
+  }
+  if (isLimited()) {
+    mode += "l";
+  }
+  if (!mode.empty()) {
+    std::stringstream ss;
+    ss << "+" << mode;
+    if (findClient(_clients, client->getClientFd()) != NULL) {
+      if (isPassRequired()) {
+        ss << " " << _password;
+      }
+      if (isLimited()) {
+        ss << " " << _limit;
+      }
+    }
+    mode = ss.str();
+  }
+  return mode;
 }
 
 void Channel::addClient(Client *client) {
