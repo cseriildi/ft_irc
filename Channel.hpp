@@ -27,7 +27,9 @@ class Channel {
   std::string getName() const;
   std::string getTopic() const;
   std::string getPassword() const;
+  std::string getMode(Client *client) const;
   bool isInviteOnly() const;
+  bool isTopicOperOnly() const;
   bool isTopicSet() const;
   bool isPassRequired() const;
   std::string getPass() const;
@@ -41,6 +43,7 @@ class Channel {
   void setPass(const std::string &pass);
   void setLimited(bool limited);
   void setLimit(size_t limit);
+  void setTopicOperOnly(bool topicOperOnly);
 
   void addClient(Client *client);
   void removeClient(int clientFd);
@@ -58,6 +61,7 @@ class Channel {
   std::string _topic;
   std::string _password;
   bool _isInviteOnly;
+  bool _topicOperOnly;
   bool _topicSet;
   bool _passRequired;
   std::string _pass;

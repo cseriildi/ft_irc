@@ -4,6 +4,7 @@
 #include <sys/types.h>
 
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <iomanip>
@@ -321,10 +322,155 @@ void Client::part(const std::vector<std::string> &msg) {
   }
 }
 
-void Client::kick(const std::vector<std::string> &msg) { (void)msg; }
+void Client::kick(const std::vector<std::string> &msg) {
+  if (msg.size() < 3 || msg[1].empty() || msg[2].empty()) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  const std::vector<std::string> channels = split(msg[1], ',');
+  const std::vector<std::string> clients = split(msg[2], ',');
+  if (channels.size() != clients.size() && channels.size() != 1) {
+    /*  For the message to be syntactically correct, there MUST be
+    either one channel parameter and multiple user parameter, or as many
+    channel parameters as there are user parameters. */
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  const std::string reason = (msg.size() > 3 ? msg[3] : "");
+  std::vector<std::string>::const_iterator channelIt = channels.begin();
+  std::vector<std::string>::const_iterator clientIt = clients.begin();
+
+  for (; clientIt != clients.end(); ++clientIt) {
+    const std::string &channelName = *channelIt;
+    const std::string &nick = *clientIt;
+    if (channels.size() != 1) {
+      ++channelIt;
+    }
+
+    Channel *channel = findChannel(_server->getChannels(), channelName);
+    if (channel == NULL) {
+      createMessage(Server::ERR_NOSUCHCHANNEL, channelName);
+      continue;
+    }
+    if (findChannel(_channels, channelName) == NULL) {
+      createMessage(Server::ERR_NOTONCHANNEL, channelName);
+      continue;
+    }
+    if (findClient(channel->getOperators(), _clientFd) == NULL) {
+      createMessage(Server::ERR_CHANOPRIVSNEEDED, channelName);
+      continue;
+    }
+    Client *targetClient = findClient(channel->getClients(), nick);
+    if (targetClient == NULL) {
+      createMessage(Server::ERR_USERNOTINCHANNEL, nick);
+      continue;
+    }
+    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " KICK " + channelName +
+                                        " " + nick + " :" + reason);
+    targetClient->removeChannel(channelName);
+  }
+}
+
 void Client::invite(const std::vector<std::string> &msg) { (void)msg; }
 void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
-void Client::mode(const std::vector<std::string> &msg) { (void)msg; }
+
+void Client::mode(const std::vector<std::string> &msg) {
+  if (msg.size() < 2 || msg[1].empty()) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  const std::string &target = msg[1];
+
+  Client *targetClient = findClient(_server->getClients(), target);
+  if (targetClient != NULL) {
+    // We don't support user MODE
+    return;
+  }
+
+  Channel *channel = findChannel(_server->getChannels(), target);
+  if (channel == NULL) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, target);
+    return;
+  }
+  if (msg.size() < 3 || msg[2].empty()) {
+    createMessage(Server::RPL_CHANNELMODEIS, channel);
+    return;
+  }
+  const std::string &modes = msg[2];
+  const size_t c = modes.find_first_not_of("+-itklo");
+  if (c != std::string::npos) {
+    createMessage(Server::ERR_UNKNOWNMODE, modes.substr(c, 1));  // TODO
+    return;
+  }
+  if (modes.find_first_of("itklo") == std::string::npos) {
+    return;
+  }
+  if (findClient(channel->getOperators(), _clientFd) == NULL) {
+    createMessage(Server::ERR_CHANOPRIVSNEEDED, target);
+    return;
+  }
+
+  bool setting = true;
+  size_t parameter_count = 0;
+  for (std::string::const_iterator it = modes.begin(); it != modes.end();
+       ++it) {
+    if (*it == '+' || *it == '-') {
+      setting = (*it == '+');
+      continue;
+    }
+    if (*it == 'k' || *it == 'o' || (setting && *it == 'l')) {
+      parameter_count++;
+    }
+  }
+  if (msg.size() < 3 + parameter_count) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  setting = true;
+  size_t index = 3;
+  for (std::string::const_iterator it = modes.begin(); it != modes.end();
+       ++it) {
+    if (*it == '+' || *it == '-') {
+      setting = (*it == '+');
+      continue;
+    }
+    if (*it == 'i') {
+      channel->setInviteOnly(setting);
+    } else if (*it == 't') {
+      channel->setTopicOperOnly(setting);
+    } else if (*it == 'k') {
+      if (setting) {
+        channel->setPassword(msg[index++]);
+      } else {
+        channel->setPassRequired(false);
+      }
+    } else if (*it == 'l') {
+      if (setting) {
+        int limit = std::atoi(msg[index++].c_str());
+        if (limit < 0) {
+          return;
+        }
+        channel->setLimit(limit);
+      } else {
+        channel->setLimited(false);
+      }
+    } else if (*it == 'o') {
+      Client *targetClient = findClient(_server->getClients(), msg[index++]);
+      if (targetClient == NULL) {
+        createMessage(Server::ERR_USERNOTINCHANNEL, msg[index - 1]);
+        continue;
+      }
+      if (setting) {
+        channel->addOperator(targetClient);
+      } else {
+        channel->removeOperator(targetClient->getClientFd());
+      }
+    }
+  }
+  createMessage(Server::RPL_CHANNELMODEIS, channel);
+}
+
 void Client::names(const std::vector<std::string> &msg) { (void)msg; }
 
 void Client::list(const std::vector<std::string> &msg) {
@@ -533,7 +679,7 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
     ss << targetChannel->getClients().size() << " :"
        << targetChannel->getTopic();
   } else if (response_code == Server::RPL_CHANNELMODEIS) {
-    // ss << targetChannel->getMode(); TODO
+    ss << targetChannel->getMode(this);
   } else if (response_code == Server::RPL_NOTOPIC) {
     ss << ":No topic is set";
   } else if (response_code == Server::RPL_TOPIC) {
