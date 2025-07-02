@@ -382,14 +382,43 @@ void Client::kick(const std::vector<std::string> &msg) {
     /*  For the message to be syntactically correct, there MUST be
     either one channel parameter and multiple user parameter, or as many
     channel parameters as there are user parameters. */
-    // TODO: check error message
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
-  const std::string reason = (msg.size() > 3 ? msg[3] : "Client kicked");
-  // TODO: check default kick message
+  const std::string reason = (msg.size() > 3 ? msg[3] : "");
+  std::vector<std::string>::const_iterator channelIt = channels.begin();
+  std::vector<std::string>::const_iterator clientIt = clients.begin();
 
-  // TODO: check channel, client, loop, kick
+  for (; clientIt != clients.end(); ++clientIt) {
+    const std::string &channelName = *channelIt;
+    const std::string &nick = *clientIt;
+    if (channels.size() != 1) {
+      ++channelIt;
+    }
+
+    Channel *channel = findChannel(_server->getChannels(), channelName);
+    if (channel == NULL) {
+      createMessage(Server::ERR_NOSUCHCHANNEL, channelName);
+      continue;
+    }
+    if (findChannel(_channels, channelName) == NULL) {
+      createMessage(Server::ERR_NOTONCHANNEL, channelName);
+      continue;
+    }
+    if (findClient(channel->getOperators(), _clientFd) == NULL) {
+      createMessage(Server::ERR_CHANOPRIVSNEEDED, channelName);
+      continue;
+    }
+    Client *targetClient = findClient(channel->getClients(), nick);
+    if (targetClient == NULL) {
+      createMessage(Server::ERR_USERNOTINCHANNEL, nick);
+      continue;
+    }
+    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " KICK " + channelName +
+                                        " " + nick + " :" + reason);
+    targetClient->removeChannel(channelName);
+  }
 }
 
 
