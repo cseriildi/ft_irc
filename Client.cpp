@@ -3,6 +3,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <cctype>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -123,7 +124,7 @@ void Client::nick(const std::vector<std::string> &msg) {
     return;
   }
   const std::string &nick = msg[1];
-  if (nick.find(' ') != std::string::npos) {
+  if (!Client::isValidName(nick)) {
     createMessage(Server::ERR_ERRONEUSNICKNAME, nick);
     return;
   }
@@ -481,6 +482,19 @@ void Client::server_time(const std::vector<std::string> &msg) {
 }
 
 // * HELPERS *
+
+bool Client::isValidName(const std::string &name) {
+  if (name.empty() || name.length() > 50 || std::isalpha(name[0]) == 0 ||
+      name.find_first_of(" ,:") != std::string::npos) {
+    return false;
+  }
+  for (std::string::const_iterator it = name.begin(); it != name.end(); ++it) {
+    if (std::isprint(*it) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
 
 void Client::removeChannel(const std::string &name) {
   Channel *channel = findChannel(_channels, name);
