@@ -77,7 +77,8 @@ class Client {
   // * COMMUNICATION *
   void receive();
   void answer();
-  void createMessage(ERR error_code, const std::string &param = "");
+  void createMessage(ERR error_code, const std::string &param = "",
+                     const std::string &end = "");
   void createMessage(RPL response_code);
   void createMessage(RPL response_code, Client *targetClient);
   void createMessage(RPL response_code, Channel *targetChannel);

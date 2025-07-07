@@ -218,7 +218,7 @@ void Client::whois(const std::vector<std::string> &msg) {
 
 void Client::privmsg(const std::vector<std::string> &msg) {
   if (msg.size() < 2) {
-    createMessage(Server::ERR_NORECIPIENT, msg[0]);
+    createMessage(Server::ERR_NORECIPIENT, "", "(" + msg[0] + ")");
     return;
   }
   if (msg.size() < 3) {
@@ -401,7 +401,7 @@ void Client::kick(const std::vector<std::string> &msg) {
     }
     Client *targetClient = findClient(channel->getClients(), nick);
     if (targetClient == NULL) {
-      createMessage(Server::ERR_USERNOTINCHANNEL, nick);
+      createMessage(Server::ERR_USERNOTINCHANNEL, nick + " " + channelName);
       continue;
     }
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
@@ -509,7 +509,7 @@ void Client::mode(const std::vector<std::string> &msg) {
   const std::string &modes = msg[2];
   const size_t c = modes.find_first_not_of("+-itklo");
   if (c != std::string::npos) {
-    createMessage(Server::ERR_UNKNOWNMODE, modes.substr(c, 1));  // TODO
+    createMessage(Server::ERR_UNKNOWNMODE, modes.substr(c, 1), target);
     return;
   }
   if (modes.find_first_of("itklo") == std::string::npos) {
@@ -565,9 +565,10 @@ void Client::mode(const std::vector<std::string> &msg) {
         channel->setLimited(false);
       }
     } else if (*it == 'o') {
-      Client *targetClient = findClient(_server->getClients(), msg[index++]);
+      const std::string &nick = msg[index++];
+      Client *targetClient = findClient(_server->getClients(), nick);
       if (targetClient == NULL) {
-        createMessage(Server::ERR_USERNOTINCHANNEL, msg[index - 1]);
+        createMessage(Server::ERR_USERNOTINCHANNEL, nick + " " + target);
         continue;
       }
       if (setting) {
@@ -744,7 +745,8 @@ void Client::answer() {
 
 // * MESSAGES *
 
-void Client::createMessage(ERR error_code, const std::string &param) {
+void Client::createMessage(ERR error_code, const std::string &param,
+                           const std::string &end) {
   std::stringstream ss;
   ss << ":" << _server->getName() << " " << error_code;
   ss << " " << (_isAuthenticated ? _nick : "*") << " ";
@@ -752,6 +754,9 @@ void Client::createMessage(ERR error_code, const std::string &param) {
 
   if (Server::ERRORS.find(error_code) != Server::ERRORS.end()) {
     ss << Server::ERRORS.at(error_code);
+    if (!end.empty()) {
+      ss << " " << end;
+    }
   } else {
     ss << "Unknown error";
   }
