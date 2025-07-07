@@ -250,14 +250,8 @@ void Client::_messageClient(const std::vector<std::string> &msg) {
 }
 
 void Client::_messageChannel(const std::vector<std::string> &msg) {
-  std::string target = msg[1];
-  if (target[0] == ':') {
-    target = target.substr(1);
-  }
-  std::string text = msg[2];
-  if (text[0] == ':') {
-    text = text.substr(1);
-  }
+  const std::string &target = msg[1];
+  const std::string &text = msg[2];
   Channel *targetChannel = findChannel(_server->getChannels(), target);
   if (targetChannel == NULL) {
     createMessage(Server::ERR_NOSUCHCHANNEL, target);
