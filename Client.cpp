@@ -41,7 +41,6 @@ std::map<std::string, CommandFunction> Client::init_commands_map() {
   commands["CAP"] = &Client::cap;
   commands["PING"] = &Client::ping;
   commands["QUIT"] = &Client::quit;
-  commands["WHO"] = &Client::who;
   commands["WHOIS"] = &Client::whois;
   commands["PRIVMSG"] = &Client::privmsg;
   commands["TIME"] = &Client::server_time;
@@ -167,7 +166,6 @@ void Client::cap(const std::vector<std::string> &msg) {
     _server->sendToClient(this, ":" + _server->getName() + " CAP " +
                                     (_isAuthenticated ? _nick : "*") + " LS :");
   }
-  // https://ircv3.net/specs/extensions/capability-negotiation.html
 }
 
 void Client::ping(const std::vector<std::string> &msg) {
@@ -217,8 +215,6 @@ void Client::whois(const std::vector<std::string> &msg) {
   createMessage(Server::RPL_WHOISIDLE, targetClient);
   createMessage(Server::RPL_ENDOFWHOIS);
 }
-
-void Client::who(const std::vector<std::string> &msg) { (void)msg; }
 
 void Client::privmsg(const std::vector<std::string> &msg) {
   if (msg.size() < 2) {
@@ -324,7 +320,6 @@ void Client::join(const std::vector<std::string> &msg) {
         continue;
       }
     }
-    // TODO: check the channel limit for user ERR_TOOMANYCHANNELS
     targetChannel->addClient(this);
     _channels[name] = targetChannel;
     // If a JOIN is successful, the user receives a JOIN message as
@@ -607,9 +602,6 @@ void Client::names(const std::vector<std::string> &msg) {
          it != _server->getChannels().end(); ++it) {
       createMessage(Server::RPL_NAMREPLY, it->second);
     }
-    /* TODO: At the end of this list, a list of users who
-       are visible but either not on any channel or not on a visible channel
-       are listed as being on `channel' "*". */
   } else {
     std::vector<std::string> channels = split(msg[1], ',');
     for (std::vector<std::string>::const_iterator it = channels.begin();

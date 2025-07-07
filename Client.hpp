@@ -36,7 +36,6 @@ class Client {
   void pass(const std::vector<std::string> &msg);
   void nick(const std::vector<std::string> &msg);
   void user(const std::vector<std::string> &msg);
-  void who(const std::vector<std::string> &msg);
   void whois(const std::vector<std::string> &msg);
   void privmsg(const std::vector<std::string> &msg);
   void ping(const std::vector<std::string> &msg);

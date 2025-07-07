@@ -67,7 +67,7 @@ Server::Server(const std::string &port, const std::string &pass)
       _name("localhost"),  // TODO
       _password(pass),
       _createdAt(std::time(NULL)) {
-  _isPassRequired = !_password.empty();  // TODO: think about it
+  _isPassRequired = !_password.empty();
   struct addrinfo hints = {};            // create hints struct for getaddrinfo
   std::memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;      // AF_INET for IPv4 only, AF_INET6 for IPv6,
