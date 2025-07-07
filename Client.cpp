@@ -322,10 +322,6 @@ void Client::join(const std::vector<std::string> &msg) {
     }
     targetChannel->addClient(this);
     _channels[name] = targetChannel;
-    // If a JOIN is successful, the user receives a JOIN message as
-    // confirmation and is then sent the channel's topic (using RPL_TOPIC) and
-    // the list of users who are on the channel (using RPL_NAMREPLY), which
-    // MUST include the user joining.
 
     _server->sendToChannel(targetChannel, ":" + _nick + "!~" + _user + "@" +
                                               _hostname + " JOIN " + name);
