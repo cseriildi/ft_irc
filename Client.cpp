@@ -228,8 +228,7 @@ void Client::privmsg(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_NOTEXTTOSEND, msg[0]);
     return;
   }
-  if ((msg[1].size() > 0 && (msg[1][0] == '#' || msg[1][0] == '&' || msg[1][0] == '+' || msg[1][0] == '!')) ||
-      (msg[1].size() > 1 && (msg[1][1] == '#' || msg[1][1] == '&' || msg[1][1] == '+' || msg[1][1] == '!'))) {
+  if (msg[1].size() > 0 && (msg[1][0] == '#' || msg[1][0] == '&' || msg[1][0] == '+' || msg[1][0] == '!')) {
     _messageChannel(msg);
   } else {
     _messageClient(msg);
