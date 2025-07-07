@@ -3,6 +3,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <cctype>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -123,7 +124,7 @@ void Client::nick(const std::vector<std::string> &msg) {
     return;
   }
   const std::string &nick = msg[1];
-  if (nick.find(' ') != std::string::npos) {
+  if (!Client::isValidName(nick)) {
     createMessage(Server::ERR_ERRONEUSNICKNAME, nick);
     return;
   }
@@ -218,7 +219,53 @@ void Client::whois(const std::vector<std::string> &msg) {
 }
 
 void Client::who(const std::vector<std::string> &msg) { (void)msg; }
-void Client::privmsg(const std::vector<std::string> &msg) { (void)msg; }
+
+void Client::privmsg(const std::vector<std::string> &msg) {
+  if (msg.size() < 2) {
+    createMessage(Server::ERR_NORECIPIENT, msg[0]);
+    return;
+  }
+  if (msg.size() < 3) {
+    createMessage(Server::ERR_NOTEXTTOSEND, msg[0]);
+    return;
+  }
+  if (!msg[1].empty() &&
+      std::string(CHANNEL_PREFIXES).find(msg[1][0]) != std::string::npos) {
+    _messageChannel(msg);
+  } else {
+    _messageClient(msg);
+  }
+}
+
+void Client::_messageClient(const std::vector<std::string> &msg) {
+  const std::string &target = msg[1];
+  const std::string &text = msg[2];
+  Client *targetClient = findClient(_server->getClients(), target);
+  if (targetClient == NULL) {
+    createMessage(Server::ERR_NOSUCHNICK, target);
+    return;
+  }
+  const std::string toSend = ":" + _nick + "!~" + _user + "@" + _hostname +
+                             " PRIVMSG " + target + " :" + text;
+  _server->sendToClient(targetClient, toSend);
+}
+
+void Client::_messageChannel(const std::vector<std::string> &msg) {
+  const std::string &target = msg[1];
+  const std::string &text = msg[2];
+  Channel *targetChannel = findChannel(_server->getChannels(), target);
+  if (targetChannel == NULL) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, target);
+    return;
+  }
+  if (findChannel(_channels, target) == NULL) {
+    createMessage(Server::ERR_CANNOTSENDTOCHAN, target);
+    return;
+  }
+  const std::string toSend = ":" + _nick + "!~" + _user + "@" + _hostname +
+                             " PRIVMSG " + target + " :" + text;
+  _server->sendToChannel(targetChannel, toSend, this);
+}
 
 void Client::join(const std::vector<std::string> &msg) {
   if (msg.size() < 2 || msg[1].empty()) {
@@ -285,12 +332,14 @@ void Client::join(const std::vector<std::string> &msg) {
     // the list of users who are on the channel (using RPL_NAMREPLY), which
     // MUST include the user joining.
 
-    // TODO: send confirmation to client
-    // RPL_TOPIC;
-    // RPL_NAMREPLY;
-
     _server->sendToChannel(targetChannel, ":" + _nick + "!~" + _user + "@" +
                                               _hostname + " JOIN " + name);
+    if (targetChannel->isTopicSet()) {
+      createMessage(Server::RPL_TOPIC, targetChannel);
+    }
+
+    createMessage(Server::RPL_NAMREPLY, targetChannel);
+    createMessage(Server::RPL_ENDOFNAMES, targetChannel);
   }
 }
 
@@ -364,7 +413,39 @@ void Client::invite(const std::vector<std::string> &msg) {
   createMessage(Server::RPL_INVITING, targetChannel, targetClient);
 }
 
-void Client::topic(const std::vector<std::string> &msg) { (void)msg; }
+void Client::topic(const std::vector<std::string> &msg) {
+  if (msg.size() < 2 || msg[1].empty()) {
+    createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
+    return;
+  }
+  const std::string &target = msg[1];
+  Channel *channel = findChannel(_server->getChannels(), target);
+  if (channel == NULL) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, target);
+    return;
+  }
+  if (findChannel(_channels, target) == NULL) {
+    createMessage(Server::ERR_NOTONCHANNEL, target);
+    return;
+  }
+  if (msg.size() > 2) {
+    if (channel->isTopicOperOnly() &&
+        findClient(channel->getOperators(), _clientFd) == NULL) {
+      createMessage(Server::ERR_CHANOPRIVSNEEDED, target);
+      return;
+    }
+    channel->setTopic(msg[2]);
+    channel->setTopicSet(true);
+    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " TOPIC " + target + " :" +
+                                        channel->getTopic());
+  }
+  if (!channel->isTopicSet()) {
+    createMessage(Server::RPL_NOTOPIC, channel);
+  } else {
+    createMessage(Server::RPL_TOPIC, channel);
+  }
+}
 
 void Client::mode(const std::vector<std::string> &msg) {
   if (msg.size() < 2 || msg[1].empty()) {
@@ -459,10 +540,41 @@ void Client::mode(const std::vector<std::string> &msg) {
       }
     }
   }
-  createMessage(Server::RPL_CHANNELMODEIS, channel);
+  std::string mode_change = modes;
+  for (size_t i = 3; i < msg.size(); ++i) {
+    mode_change += " " + msg[i];
+  }
+
+  _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" + _hostname +
+                                      " MODE " + channel->getName() + " " +
+                                      mode_change);
 }
 
-void Client::names(const std::vector<std::string> &msg) { (void)msg; }
+void Client::names(const std::vector<std::string> &msg) {
+  if (msg.size() > 2 && msg[2] != _server->getName()) {
+    createMessage(Server::ERR_NOSUCHSERVER, msg[2]);
+    return;
+  }
+  if (msg.size() == 1) {
+    for (ChannelList::const_iterator it = _server->getChannels().begin();
+         it != _server->getChannels().end(); ++it) {
+      createMessage(Server::RPL_NAMREPLY, it->second);
+    }
+    /* TODO: At the end of this list, a list of users who
+       are visible but either not on any channel or not on a visible channel
+       are listed as being on `channel' "*". */
+  } else {
+    std::vector<std::string> channels = split(msg[1], ',');
+    for (std::vector<std::string>::const_iterator it = channels.begin();
+         it != channels.end(); ++it) {
+      Channel *channel = findChannel(_server->getChannels(), *it);
+      if (channel != NULL) {
+        createMessage(Server::RPL_NAMREPLY, channel);
+      }
+    }
+  }
+  createMessage(Server::RPL_ENDOFNAMES);
+}
 
 void Client::list(const std::vector<std::string> &msg) {
   if (msg.size() > 2 && msg[2] != _server->getName()) {
@@ -496,6 +608,19 @@ void Client::server_time(const std::vector<std::string> &msg) {
 }
 
 // * HELPERS *
+
+bool Client::isValidName(const std::string &name) {
+  if (name.empty() || name.length() > 50 || std::isalpha(name[0]) == 0 ||
+      name.find_first_of(" ,:") != std::string::npos) {
+    return false;
+  }
+  for (std::string::const_iterator it = name.begin(); it != name.end(); ++it) {
+    if (std::isprint(*it) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
 
 void Client::removeChannel(const std::string &name) {
   Channel *channel = findChannel(_channels, name);
@@ -619,6 +744,8 @@ void Client::createMessage(RPL response_code) {
     ss << _server->getName() << " :" << get_time(std::time(NULL));
   } else if (response_code == Server::RPL_ENDOFWHOIS) {
     ss << ":End of WHOIS list";
+  } else if (response_code == Server::RPL_ENDOFNAMES) {
+    ss << ":End of NAMES list";
   } else {
     ss << ":Unknown response code";
   }
@@ -663,20 +790,38 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
     return;
   }
   std::stringstream ss;
-  ss << ":" << _server->getName() << " " << response_code << " " << _nick << " "
-     << targetChannel->getName() << " ";
+  ss << ":" << _server->getName() << " " << response_code << " " << _nick
+     << " ";
 
   if (response_code == Server::RPL_LIST) {
-    ss << targetChannel->getClients().size() << " :"
-       << targetChannel->getTopic();
+    ss << targetChannel->getName() << " " << targetChannel->getClients().size()
+       << " :" << targetChannel->getTopic();
   } else if (response_code == Server::RPL_CHANNELMODEIS) {
-    ss << targetChannel->getMode(this);
+    ss << targetChannel->getName() << " " << targetChannel->getMode(this);
   } else if (response_code == Server::RPL_NOTOPIC) {
-    ss << ":No topic is set";
+    ss << targetChannel->getName() << " :No topic is set";
   } else if (response_code == Server::RPL_TOPIC) {
-    ss << ":" << targetChannel->getTopic();
+    ss << targetChannel->getName() << " :" << targetChannel->getTopic();
+  } else if (response_code == Server::RPL_NAMREPLY) {
+    const ClientList &clients = targetChannel->getClients();
+    const ClientList &operators = targetChannel->getOperators();
+    ss << "= " << targetChannel->getName() << " :";  // TODO check channel types
+    for (ClientList::const_iterator it = clients.begin(); it != clients.end();
+         ++it) {
+      if (it != clients.begin()) {
+        ss << " ";
+      }
+      if (findClient(operators, it->first) != NULL) {
+        ss << "@";  // Channel operator
+      }
+      ss << it->second->getNick();
+    }
+  } else if (response_code == Server::RPL_LISTEND) {
+    ss << targetChannel->getName() << " :End of LIST";
+  } else if (response_code == Server::RPL_ENDOFNAMES) {
+    ss << targetChannel->getName() << " :End of NAMES list";
   } else {
-    ss << ":Unknown response code";
+    ss << targetChannel->getName() << " :Unknown response code";
   }
   _server->sendToClient(this, ss.str());
 }
