@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>  // for send, recv
 
+#include <ctime>
 #include <map>
 #include <string>
 #include <vector>
@@ -29,19 +30,8 @@ class Client {
   Client(int sockfd, Server *server);
   ~Client();
 
+  // * COMMANDS *
   void handle(const std::string &msg);
-  void receive();
-  void answer();
-  bool wantsToWrite() const;
-  void appendToOutBuffer(const std::string &msg);
-
-  void createMessage(ERR error_code, const std::string &param = "");
-  void createMessage(RPL response_code);
-  void createMessage(RPL response_code, Client *targetClient);
-  void createMessage(RPL response_code, Channel *targetChannel);
-  void createMessage(RPL response_code, Channel *targetChannel,
-                     Client *targetClient);
-
   void pass(const std::vector<std::string> &msg);
   void nick(const std::vector<std::string> &msg);
   void user(const std::vector<std::string> &msg);
@@ -49,8 +39,12 @@ class Client {
   void whois(const std::vector<std::string> &msg);
   void privmsg(const std::vector<std::string> &msg);
   void ping(const std::vector<std::string> &msg);
+  void cap(const std::vector<std::string> &msg);
+  void quit(const std::vector<std::string> &msg);
+  void list(const std::vector<std::string> &msg);
+  void server_time(const std::vector<std::string> &msg);
 
-  // Channel comman
+  // * CHANNEL COMMANDS *
   void join(const std::vector<std::string> &msg);
   void part(const std::vector<std::string> &msg);
   void kick(const std::vector<std::string> &msg);
@@ -59,32 +53,38 @@ class Client {
   void mode(const std::vector<std::string> &msg);
   void names(const std::vector<std::string> &msg);
 
-  // Server commands
-  void cap(const std::vector<std::string> &msg);
-  void quit(const std::vector<std::string> &msg);
-  void list(const std::vector<std::string> &msg);
-
-  // getters
+  // * GETTERS AND SETTERS *
   int getClientFd() const;
   const std::string &getNick() const;
   const std::string &getUser() const;
-  int getMode() const;
   const std::string &getHostname() const;
   const std::string &getRealName() const;
   const std::string &getPassword() const;
+  time_t getJoinedAt() const;
   bool isPassSet() const;
   bool isNickSet() const;
   bool isUserSet() const;
   bool isAuthenticated() const;
   bool wantsToQuit() const;
+  bool wantsToWrite() const;
   const ChannelList &getChannels() const;
 
+  // * HELPERS *
   static bool isValidName(const std::string &name);
+  void removeChannel(const std::string &name);
+  void appendToOutBuffer(const std::string &msg);
 
-   void removeChannel(const std::string &name);
+  // * COMMUNICATION *
+  void receive();
+  void answer();
+  void createMessage(ERR error_code, const std::string &param = "");
+  void createMessage(RPL response_code);
+  void createMessage(RPL response_code, Client *targetClient);
+  void createMessage(RPL response_code, Channel *targetChannel);
+  void createMessage(RPL response_code, Channel *targetChannel,
+                     Client *targetClient);
 
  private:
-  // Instance of IRC interpeter, called with a string, returns a string
   Client();
   Client(const Client &other);
   Client &operator=(const Client &other);
@@ -97,12 +97,10 @@ class Client {
   int _clientFd;
   std::string _nick;
   std::string _user;
-  int _mode;  // TODO: check what does this mean: bit 2 - w, bit 3 - i
-              // (https://www.rfc-editor.org/rfc/rfc2812.html#section-3.1.5)
   std::string _hostname;
   std::string _realName;
   std::string _password;
-
+  time_t _joinedAt;
   bool _isPassSet;
   bool _isNickSet;
   bool _isUserSet;
