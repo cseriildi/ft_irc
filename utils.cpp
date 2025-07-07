@@ -65,7 +65,7 @@ std::vector<std::string> split(const std::string &line, char delimiter) {
 }
 
 std::vector<std::string> parse(const std::string &line) {
-  size_t const found_colon = line.find(':');
+  size_t const found_colon = line.find(" :");
   std::vector<std::string> result = split(line.substr(0, found_colon), ' ');
 
   if (found_colon != std::string::npos) {
