@@ -229,12 +229,12 @@ void Client::privmsg(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_NOTEXTTOSEND, msg[0]);
     return;
   }
-  if (msg[1].size() > 0 && (std::string(CHANNEL_PREFIXES).find(msg[1][0]) != std::string::npos)) {
+  if (!msg[1].empty() &&
+      std::string(CHANNEL_PREFIXES).find(msg[1][0]) != std::string::npos) {
     _messageChannel(msg);
   } else {
     _messageClient(msg);
   }
-
 }
 
 void Client::_messageClient(const std::vector<std::string> &msg) {
@@ -467,7 +467,14 @@ void Client::mode(const std::vector<std::string> &msg) {
       }
     }
   }
-  createMessage(Server::RPL_CHANNELMODEIS, channel);
+  std::string mode_change = modes;
+  for (size_t i = 3; i < msg.size(); ++i) {
+    mode_change += " " + msg[i];
+  }
+
+  _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" + _hostname +
+                                      " MODE " + channel->getName() + " " +
+                                      mode_change);
 }
 
 void Client::names(const std::vector<std::string> &msg) {
@@ -717,7 +724,7 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
     ss << targetChannel->getName() << " " << targetChannel->getClients().size()
        << " :" << targetChannel->getTopic();
   } else if (response_code == Server::RPL_CHANNELMODEIS) {
-    ss << targetChannel->getMode(this);
+    ss << targetChannel->getName() << " " << targetChannel->getMode(this);
   } else if (response_code == Server::RPL_NOTOPIC) {
     ss << targetChannel->getName() << " :No topic is set";
   } else if (response_code == Server::RPL_TOPIC) {
