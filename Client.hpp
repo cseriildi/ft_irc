@@ -10,6 +10,7 @@
 #include "Server.hpp"
 
 #define BUFFER_SIZE 512  // standard message size for IRC
+#define CHANNEL_PREFIXES "#&+!"
 
 class Channel;
 
@@ -91,6 +92,8 @@ class Client {
 
   void _authenticate();
   void _broadcastNickChange(const std::string &newNick);
+  void _messageClient(const std::vector<std::string> &msg);
+  void _messageChannel(const std::vector<std::string> &msg);
 
   int _clientFd;
   std::string _nick;
