@@ -219,7 +219,53 @@ void Client::whois(const std::vector<std::string> &msg) {
 }
 
 void Client::who(const std::vector<std::string> &msg) { (void)msg; }
-void Client::privmsg(const std::vector<std::string> &msg) { (void)msg; }
+
+void Client::privmsg(const std::vector<std::string> &msg) {
+  if (msg.size() < 2) {
+    createMessage(Server::ERR_NORECIPIENT, msg[0]);
+    return;
+  }
+  if (msg.size() < 3) {
+    createMessage(Server::ERR_NOTEXTTOSEND, msg[0]);
+    return;
+  }
+  if (msg[1].size() > 0 && (std::string(CHANNEL_PREFIXES).find(msg[1][0]) != std::string::npos)) {
+    _messageChannel(msg);
+  } else {
+    _messageClient(msg);
+  }
+
+}
+
+void Client::_messageClient(const std::vector<std::string> &msg) {
+  const std::string &target = msg[1];
+  const std::string &text = msg[2];
+  Client *targetClient = findClient(_server->getClients(), target);
+  if (targetClient == NULL) {
+    createMessage(Server::ERR_NOSUCHNICK, target);
+    return;
+  }
+  const std::string toSend = ":" + _nick + "!~" + _user + "@" + _hostname +
+                             " PRIVMSG " + target + " :" + text;
+  _server->sendToClient(targetClient, toSend);
+}
+
+void Client::_messageChannel(const std::vector<std::string> &msg) {
+  const std::string &target = msg[1];
+  const std::string &text = msg[2];
+  Channel *targetChannel = findChannel(_server->getChannels(), target);
+  if (targetChannel == NULL) {
+    createMessage(Server::ERR_NOSUCHCHANNEL, target);
+    return;
+  }
+  if (findChannel(_channels, target) == NULL) {
+    createMessage(Server::ERR_CANNOTSENDTOCHAN, target);
+    return;
+  }
+  const std::string toSend = ":" + _nick + "!~" + _user + "@" + _hostname +
+                             " PRIVMSG " + target + " :" + text;
+  _server->sendToChannel(targetChannel, toSend, this);
+}
 
 void Client::join(const std::vector<std::string> &msg) {
   if (msg.size() < 2 || msg[1].empty()) {
