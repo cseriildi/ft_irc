@@ -352,9 +352,8 @@ void Client::part(const std::vector<std::string> &msg) {
       createMessage(Server::ERR_NOTONCHANNEL, name);
       continue;
     }
-    // TODO: check default part message
     const std::string reason =
-        (msg.size() > 2 ? msg[2] : "Client left the channel");
+        (msg.size() > 2 ? msg[2] : "");
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
                                         _hostname + " PART " + name + " :" +
                                         reason);
