@@ -385,7 +385,7 @@ void Client::kick(const std::vector<std::string> &msg) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
-  const std::string reason = (msg.size() > 3 ? msg[3] : "");
+  const std::string reason = (msg.size() > 3 ? msg[3] : _nick);
   std::vector<std::string>::const_iterator channelIt = channels.begin();
   std::vector<std::string>::const_iterator clientIt = clients.begin();
 
@@ -421,7 +421,6 @@ void Client::kick(const std::vector<std::string> &msg) {
   }
 }
 
-
 void Client::invite(const std::vector<std::string> &msg) {
   if (msg.size() < 3 || msg[1].empty() || msg[2].empty()) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
@@ -441,8 +440,7 @@ void Client::invite(const std::vector<std::string> &msg) {
     return;
   }
   const ClientList clients = targetChannel->getClients();
-  if (findClient(clients, targetClient->getClientFd()) !=
-      NULL) {
+  if (findClient(clients, targetClient->getClientFd()) != NULL) {
     createMessage(Server::ERR_USERONCHANNEL, nick + " " + channel);
     return;
   }
