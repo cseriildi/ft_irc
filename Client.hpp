@@ -10,6 +10,7 @@
 #include "Server.hpp"
 
 #define BUFFER_SIZE 512  // standard message size for IRC
+#define CHANNEL_PREFIXES "#&+!"
 
 class Channel;
 
