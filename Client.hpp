@@ -74,6 +74,7 @@ class Client {
   static bool isValidName(const std::string &name);
   void removeChannel(const std::string &name);
   void appendToOutBuffer(const std::string &msg);
+  void leaveAllChannels(const std::string &reason, const std::string &command = "PART");
 
   // * COMMUNICATION *
   void receive();

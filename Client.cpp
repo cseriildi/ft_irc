@@ -184,16 +184,26 @@ void Client::ping(const std::vector<std::string> &msg) {
   }
 }
 
+void Client::leaveAllChannels(const std::string &reason, const std::string &command) {
+  std::cout << "leaveAllChannels called with reason: " << reason
+            << " and command: " << command << '\n';
+  for (ChannelList::iterator it = _channels.begin();
+       it != _channels.end(); ++it) {
+    Channel *channel = it->second;
+    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " " + command + " " +
+                                        channel->getName() + " :" + reason);
+    channel->removeClient(_clientFd);
+    if (channel->getClients().empty()) {
+      _server->removeChannel(channel->getName());
+    }
+  }
+}
+
 void Client::quit(const std::vector<std::string> &msg) {
   const std::string reason = (msg.size() > 1 ? msg[1] : "Client quit");
 
-  // TODO: make a function to broadcast to all channels of the client
-  while (!_channels.empty()) {
-    _server->sendToChannel(
-        _channels.begin()->second,
-        ":" + _nick + "!~" + _user + "@" + _hostname + " QUIT :" + reason);
-    removeChannel(_channels.begin()->first);
-  }
+  leaveAllChannels(reason, "QUIT");
   _wantsToQuit = true;
 }
 
@@ -276,15 +286,7 @@ void Client::join(const std::vector<std::string> &msg) {
   const std::vector<std::string> keys =
       split((msg.size() > 2 ? msg[2] : ""), ',');
   if (*channels.begin() == "0") {
-    // TODO: call the broadcast to all channels of the client function with PART
-    // TODO: make a remove all channels function
-    std::vector<std::string> command;
-    command.push_back("PART");
-    for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
-         ++it) {
-      command.push_back(it->first);
-    }
-    part(command);
+    leaveAllChannels("Client left all channels", "PART"); // TODO: check actual message
     return;
   }
   for (std::vector<std::string>::const_iterator it = channels.begin();
@@ -324,7 +326,6 @@ void Client::join(const std::vector<std::string> &msg) {
         continue;
       }
     }
-    // TODO: check the channel limit for user ERR_TOOMANYCHANNELS
     targetChannel->addClient(this);
     _channels[name] = targetChannel;
     // If a JOIN is successful, the user receives a JOIN message as
@@ -361,7 +362,6 @@ void Client::part(const std::vector<std::string> &msg) {
       createMessage(Server::ERR_NOTONCHANNEL, name);
       continue;
     }
-    // TODO: check default part message
     const std::string reason =
         (msg.size() > 2 ? msg[2] : "Client left the channel");
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
@@ -519,7 +519,7 @@ void Client::mode(const std::vector<std::string> &msg) {
   const std::string &modes = msg[2];
   const size_t c = modes.find_first_not_of("+-itklo");
   if (c != std::string::npos) {
-    createMessage(Server::ERR_UNKNOWNMODE, modes.substr(c, 1));  // TODO
+    createMessage(Server::ERR_UNKNOWNMODE, modes.substr(c, 1));
     return;
   }
   if (modes.find_first_of("itklo") == std::string::npos) {
@@ -607,9 +607,6 @@ void Client::names(const std::vector<std::string> &msg) {
          it != _server->getChannels().end(); ++it) {
       createMessage(Server::RPL_NAMREPLY, it->second);
     }
-    /* TODO: At the end of this list, a list of users who
-       are visible but either not on any channel or not on a visible channel
-       are listed as being on `channel' "*". */
   } else {
     std::vector<std::string> channels = split(msg[1], ',');
     for (std::vector<std::string>::const_iterator it = channels.begin();
@@ -695,8 +692,6 @@ void Client::_authenticate() {
 }
 
 void Client::_broadcastNickChange(const std::string &newNick) {
-  // TODO: get rid of this function
-  // TODO: call broadcast to all channels of the client function
   const std::string msg =
       ":" + _nick + "!~" + _user + "@" + _hostname + " NICK :" + newNick;
 
@@ -784,7 +779,7 @@ void Client::createMessage(RPL response_code) {
     ss << ":This server was created " << get_time(_server->getCreatedAt());
   } else if (response_code == Server::RPL_MYINFO) {
     ss << _server->getName() << " 1.0 "
-       << "available user modes, available channel modes";  // TODO
+       << "available user modes, available channel modes";
   } else if (response_code == Server::RPL_LISTEND) {
     ss << ":End of LIST";
   } else if (response_code == Server::RPL_TIME) {
@@ -852,7 +847,7 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
   } else if (response_code == Server::RPL_NAMREPLY) {
     const ClientList &clients = targetChannel->getClients();
     const ClientList &operators = targetChannel->getOperators();
-    ss << "= " << targetChannel->getName() << " :";  // TODO check channel types
+    ss << "= " << targetChannel->getName() << " :";
     for (ClientList::const_iterator it = clients.begin(); it != clients.end();
          ++it) {
       if (it != clients.begin()) {

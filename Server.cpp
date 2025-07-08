@@ -269,9 +269,7 @@ void Server::removeClient(int fd) {
   if (client == NULL) {
     return;
   }
-  if (!client->getChannels().empty()) {
-    client->handle("JOIN 0");  // leave all channels, and broadcast
-  }
+  client->leaveAllChannels("Client disconnected", "QUIT");
   close(fd);
   delete client;
   _clients.erase(fd);
