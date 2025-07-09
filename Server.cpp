@@ -43,7 +43,7 @@ std::map<Server::ERR, std::string> Server::init_error_map() {
   errorMap[ERR_NONICKNAMEGIVEN] = "No nickname given";
   errorMap[ERR_ERRONEUSNICKNAME] = "Erroneous nickname";
   errorMap[ERR_NICKNAMEINUSE] = "Nickname is already in use";
-  errorMap[ERR_USERNOTINCHANNEL] = "They aren't on that channel"; //TODO
+  errorMap[ERR_USERNOTINCHANNEL] = "They aren't on that channel";  // TODO
   errorMap[ERR_NOTONCHANNEL] = "You're not on that channel";
   errorMap[ERR_USERONCHANNEL] = "User already on channel";
   errorMap[ERR_NOTREGISTERED] = "You have not registered";
@@ -52,7 +52,7 @@ std::map<Server::ERR, std::string> Server::init_error_map() {
   errorMap[ERR_PASSWDMISMATCH] = "Password mismatch";
   errorMap[ERR_KEYSET] = "Channel key already set";
   errorMap[ERR_CHANNELISFULL] = "Cannot join channel (+l)";
-  errorMap[ERR_UNKNOWNMODE] = "is unknown mode char to me for"; //TODO
+  errorMap[ERR_UNKNOWNMODE] = "is unknown mode char to me for";  // TODO
   errorMap[ERR_INVITEONLYCHAN] = "Cannot join channel (+i)";
   errorMap[ERR_BADCHANNELKEY] = "Cannot join channel (+k)";
   errorMap[ERR_CHANOPRIVSNEEDED] = "You're not channel operator";
@@ -269,7 +269,9 @@ void Server::removeClient(int fd) {
   if (client == NULL) {
     return;
   }
-  client->leaveAllChannels("Client disconnected", "QUIT");
+  if (!client->wantsToQuit()) {
+    client->leaveAllChannels("Client disconnected", "QUIT");
+  }
   close(fd);
   delete client;
   _clients.erase(fd);
