@@ -15,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Server.hpp"
@@ -352,8 +353,7 @@ void Client::part(const std::vector<std::string> &msg) {
       createMessage(Server::ERR_NOTONCHANNEL, name);
       continue;
     }
-    const std::string reason =
-        (msg.size() > 2 ? msg[2] : "");
+    const std::string reason = (msg.size() > 2 ? msg[2] : "");
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
                                         _hostname + " PART " + name + " :" +
                                         reason);
@@ -507,6 +507,8 @@ void Client::mode(const std::vector<std::string> &msg) {
     return;
   }
   const std::string &modes = msg[2];
+  std::vector<std::string> params(msg.begin() + 3, msg.end());
+
   const size_t c = modes.find_first_not_of("+-itklo");
   if (c != std::string::npos) {
     createMessage(Server::ERR_UNKNOWNMODE, modes.substr(c, 1), target);
@@ -532,12 +534,13 @@ void Client::mode(const std::vector<std::string> &msg) {
       parameter_count++;
     }
   }
-  if (msg.size() < 3 + parameter_count) {
+  if (params.size() < parameter_count) {
     createMessage(Server::ERR_NEEDMOREPARAMS, msg[0]);
     return;
   }
   setting = true;
-  size_t index = 3;
+  std::vector<std::pair<char, char> > changes;
+  std::vector<std::string>::iterator param_it = params.begin();
   for (std::string::const_iterator it = modes.begin(); it != modes.end();
        ++it) {
     if (*it == '+' || *it == '-') {
@@ -545,47 +548,74 @@ void Client::mode(const std::vector<std::string> &msg) {
       continue;
     }
     if (*it == 'i') {
+      if (setting == channel->isInviteOnly()) {
+        continue;
+      }
       channel->setInviteOnly(setting);
     } else if (*it == 't') {
+      if (setting == channel->isTopicOperOnly()) {
+        continue;
+      }
       channel->setTopicOperOnly(setting);
     } else if (*it == 'k') {
       if (setting) {
-        channel->setPassword(msg[index++]);
+        channel->setPass(*param_it++);
+      } else if (channel->getPassword() != *param_it++) {
+        continue;
       } else {
         channel->setPassRequired(false);
       }
     } else if (*it == 'l') {
       if (setting) {
-        int limit = std::atoi(msg[index++].c_str());
+        const int limit = std::atoi((*param_it).c_str());
         if (limit < 0) {
-          return;
+          param_it = params.erase(param_it);
+          continue;
         }
+        ++param_it;
         channel->setLimit(limit);
+      } else if (!channel->isLimited()) {
+        continue;
       } else {
         channel->setLimited(false);
       }
     } else if (*it == 'o') {
-      const std::string &nick = msg[index++];
-      Client *targetClient = findClient(_server->getClients(), nick);
+      const std::string &nick = *param_it;
+      Client *targetClient = findClient(channel->getClients(), nick);
       if (targetClient == NULL) {
         createMessage(Server::ERR_USERNOTINCHANNEL, nick + " " + target);
+        param_it = params.erase(param_it);
         continue;
       }
+      ++param_it;
       if (setting) {
         channel->addOperator(targetClient);
       } else {
         channel->removeOperator(targetClient->getClientFd());
       }
     }
+    changes.push_back(std::make_pair(*it, (setting ? '+' : '-')));
   }
-  std::string mode_change = modes;
-  for (size_t i = 3; i < msg.size(); ++i) {
-    mode_change += " " + msg[i];
+  while (param_it != params.end()) {
+    param_it = params.erase(param_it);
   }
-
-  _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" + _hostname +
-                                      " MODE " + channel->getName() + " " +
-                                      mode_change);
+  std::vector<std::pair<char, char> >::const_iterator it = changes.begin();
+  std::string mode_change;
+  for (; it != changes.end(); ++it) {
+    if (mode_change.empty() || (it - 1)->second != it->second) {
+      mode_change += it->second;
+    }
+    mode_change += it->first;
+  }
+  for (std::vector<std::string>::const_iterator it = params.begin();
+       it != params.end(); ++it) {
+    mode_change += " " + *it;
+  }
+  if (!mode_change.empty()) {
+    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " MODE " +
+                                        channel->getName() + " " + mode_change);
+  }
 }
 
 void Client::names(const std::vector<std::string> &msg) {
@@ -776,7 +806,7 @@ void Client::createMessage(RPL response_code) {
     ss << ":This server was created " << get_time(_server->getCreatedAt());
   } else if (response_code == Server::RPL_MYINFO) {
     ss << _server->getName() << " 1.0 "
-       << "available user modes, available channel modes";  // TODO
+       << "- " << "itklo";
   } else if (response_code == Server::RPL_LISTEND) {
     ss << ":End of LIST";
   } else if (response_code == Server::RPL_TIME) {
@@ -844,7 +874,7 @@ void Client::createMessage(RPL response_code, Channel *targetChannel) {
   } else if (response_code == Server::RPL_NAMREPLY) {
     const ClientList &clients = targetChannel->getClients();
     const ClientList &operators = targetChannel->getOperators();
-    ss << "= " << targetChannel->getName() << " :";  // TODO check channel types
+    ss << "= " << targetChannel->getName() << " :";
     for (ClientList::const_iterator it = clients.begin(); it != clients.end();
          ++it) {
       if (it != clients.begin()) {
