@@ -36,7 +36,6 @@ class Client {
   void pass(const std::vector<std::string> &msg);
   void nick(const std::vector<std::string> &msg);
   void user(const std::vector<std::string> &msg);
-  void who(const std::vector<std::string> &msg);
   void whois(const std::vector<std::string> &msg);
   void privmsg(const std::vector<std::string> &msg);
   void ping(const std::vector<std::string> &msg);
@@ -81,7 +80,8 @@ class Client {
   // * COMMUNICATION *
   void receive();
   void answer();
-  void createMessage(ERR error_code, const std::string &param = "");
+  void createMessage(ERR error_code, const std::string &param = "",
+                     const std::string &end = "");
   void createMessage(RPL response_code);
   void createMessage(RPL response_code, Client *targetClient);
   void createMessage(RPL response_code, Channel *targetChannel);

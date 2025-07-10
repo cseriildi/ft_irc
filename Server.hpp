@@ -69,7 +69,6 @@ class Server {
     ERR_UNKNOWNMODE = 472,
     ERR_INVITEONLYCHAN = 473,
     ERR_BADCHANNELKEY = 475,
-    // TODO: check what if a client gets kicked from a channel
     ERR_CHANOPRIVSNEEDED = 482
   };
 
