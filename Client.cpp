@@ -133,7 +133,14 @@ void Client::nick(const std::vector<std::string> &msg) {
     return;
   }
   if (_isAuthenticated) {
-    broadcastToAllChannels(nick, "NICK", true, false);
+    broadcastToAllChannels(nick, "NICK");
+    const std::string msg1 =
+        ":" + _nick + "!~" + _user + "@" + _hostname + " NICK :" + nick;
+
+    _server->sendToClient(this, msg1);
+  } else if (_isNickSet) {
+    createMessage(Server::ERR_ALREADYREGISTRED);
+    return;
   }
   _nick = nick;
   _isNickSet = true;
@@ -195,44 +202,24 @@ void Client::leaveAllChannels() {
   }
 }
 
-void Client::_broadcastNickChange(const std::string &newNick) {
-  const std::string msg =
-      ":" + _nick + "!~" + _user + "@" + _hostname + " NICK :" + newNick;
-
-  // to self
-  _server->sendToClient(this, msg);
-
-  // to the user's channels
+void Client::broadcastToAllChannels(const std::string &msg,
+                                    const std::string &command) {
+  const std::string halfMsg =
+      ":" + _nick + "!~" + _user + "@" + _hostname + " " + command;
   for (ChannelList::const_iterator it = _channels.begin();
        it != _channels.end(); ++it) {
-    _server->sendToChannel(it->second, msg);
-  }
-}
-
-void Client::broadcastToAllChannels(const std::string &msg, const std::string &command, bool toSelf, bool withChannelName) {
-  if (toSelf) {
-    _server->sendToClient(this, ":" + _nick + "!~" + _user + "@" + _hostname +
-                                        " " + command + " :" + msg);
-  }
-  for (ChannelList::const_iterator it = _channels.begin();
-       it != _channels.end(); ++it) {
-    std::string fullMsg = ":" + _nick + "!~" + _user + "@" +
-                                        _hostname + " " + command;
-    if (withChannelName) {
-      fullMsg += " " + it->second->getName();
+    std::string fullMsg = halfMsg;
+    if (command == "PART") {
+      fullMsg += " " + it->first;
     }
     fullMsg += " :" + msg;
-
     _server->sendToChannel(it->second, fullMsg);
   }
 }
 
 void Client::quit(const std::vector<std::string> &msg) {
-  // const std::string reason =
-  //    (msg.size() > 1 ? msg[1] : "Client Quit");  // TODO: msg[1]?
+  const std::string reason = (msg.size() > 1 ? msg[1] : "Client Quit");
 
-  (void)msg;
-  const std::string reason = "Client Quit";
   broadcastToAllChannels(reason, "QUIT");
   leaveAllChannels();
   _wantsToQuit = true;
