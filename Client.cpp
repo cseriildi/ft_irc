@@ -202,32 +202,34 @@ void Client::leaveAllChannels() {
 
 void Client::broadcastToAllChannels(const std::string &msg,
                                     const std::string &command) {
-  const std::string halfMsg =
+  std::string reply =
       ":" + _nick + "!~" + _user + "@" + _hostname + " " + command;
   if (command == "PART") {
     for (ChannelList::const_iterator it = _channels.begin();
          it != _channels.end(); ++it) {
-      _server->sendToChannel(it->second, halfMsg + " " + it->first + " :" + msg,
+      _server->sendToChannel(it->second, reply + " " + it->first + " :" + msg,
                              this);
     }
-  } else if (!_channels.empty()) {
-    ClientList all = _server->getClients();
-    std::vector<int> clients;
-    for (ChannelList::const_iterator it = _channels.begin();
-         it != _channels.end(); ++it) {
-      ClientList cl = it->second->getClients();
-      for (ClientList::const_iterator cit = cl.begin(); cit != cl.end();
-           ++cit) {
-        clients.push_back(cit->first);
-      }
+    return;
+  }
+  reply += " :" + msg;
+  if (_channels.empty()) {
+    _server->sendToClient(this, reply );
+    return;
+  }
+  std::vector<int> fds;
+  for (ChannelList::const_iterator it = _channels.begin();
+       it != _channels.end(); ++it) {
+    ClientList cl = it->second->getClients();
+    for (ClientList::const_iterator cit = cl.begin(); cit != cl.end(); ++cit) {
+      fds.push_back(cit->first);
     }
-    std::set<int> uniqueClients(clients.begin(), clients.end());
-    for (std::set<int>::const_iterator it = uniqueClients.begin();
-         it != uniqueClients.end(); ++it) {
-      _server->sendToClient(findClient(all, *it), halfMsg + " :" + msg);
-    }
-  } else {
-     _server->sendToClient(this, halfMsg + " :" + msg);
+  }
+  const ClientList clients = _server->getClients();
+  const std::set<int> uniqueClients(fds.begin(), fds.end());
+  for (std::set<int>::const_iterator it = uniqueClients.begin();
+       it != uniqueClients.end(); ++it) {
+    _server->sendToClient(findClient(clients, *it), reply);
   }
 }
 
