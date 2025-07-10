@@ -12,12 +12,14 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "Channel.hpp"
 #include "Server.hpp"
 #include "utils.hpp"
 
@@ -133,7 +135,10 @@ void Client::nick(const std::vector<std::string> &msg) {
     return;
   }
   if (_isAuthenticated) {
-    _broadcastNickChange(nick);
+    broadcastToAllChannels(nick, "NICK");
+  } else if (_isNickSet) {
+    createMessage(Server::ERR_ALREADYREGISTRED);
+    return;
   }
   _nick = nick;
   _isNickSet = true;
@@ -183,16 +188,55 @@ void Client::ping(const std::vector<std::string> &msg) {
   }
 }
 
-void Client::quit(const std::vector<std::string> &msg) {
-  const std::string reason = (msg.size() > 1 ? msg[1] : "Client quit");
-
-  // TODO: make a function to broadcast to all channels of the client
-  while (!_channels.empty()) {
-    _server->sendToChannel(
-        _channels.begin()->second,
-        ":" + _nick + "!~" + _user + "@" + _hostname + " QUIT :" + reason);
-    removeChannel(_channels.begin()->first);
+void Client::leaveAllChannels() {
+  for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
+       ++it) {
+    Channel *channel = it->second;
+    channel->removeClient(_clientFd);
+    if (channel->getClients().empty()) {
+      _server->removeChannel(channel->getName());
+    }
   }
+}
+
+void Client::broadcastToAllChannels(const std::string &msg,
+                                    const std::string &command) {
+  std::string reply =
+      ":" + _nick + "!~" + _user + "@" + _hostname + " " + command;
+  if (command == "PART") {
+    for (ChannelList::const_iterator it = _channels.begin();
+         it != _channels.end(); ++it) {
+      _server->sendToChannel(it->second, reply + " " + it->first + " :" + msg,
+                             this);
+    }
+    return;
+  }
+  reply += " :" + msg;
+  if (_channels.empty()) {
+    _server->sendToClient(this, reply );
+    return;
+  }
+  std::vector<int> fds;
+  for (ChannelList::const_iterator it = _channels.begin();
+       it != _channels.end(); ++it) {
+    ClientList cl = it->second->getClients();
+    for (ClientList::const_iterator cit = cl.begin(); cit != cl.end(); ++cit) {
+      fds.push_back(cit->first);
+    }
+  }
+  const ClientList clients = _server->getClients();
+  const std::set<int> uniqueClients(fds.begin(), fds.end());
+  for (std::set<int>::const_iterator it = uniqueClients.begin();
+       it != uniqueClients.end(); ++it) {
+    _server->sendToClient(findClient(clients, *it), reply);
+  }
+}
+
+void Client::quit(const std::vector<std::string> &msg) {
+  const std::string reason = (msg.size() > 1 ? msg[1] : "Client Quit");
+
+  broadcastToAllChannels(reason, "QUIT");
+  leaveAllChannels();
   _wantsToQuit = true;
 }
 
@@ -273,15 +317,8 @@ void Client::join(const std::vector<std::string> &msg) {
   const std::vector<std::string> keys =
       split((msg.size() > 2 ? msg[2] : ""), ',');
   if (*channels.begin() == "0") {
-    // TODO: call the broadcast to all channels of the client function with PART
-    // TODO: make a remove all channels function
-    std::vector<std::string> command;
-    command.push_back("PART");
-    for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
-         ++it) {
-      command.push_back(it->first);
-    }
-    part(command);
+    broadcastToAllChannels("", "PART");
+    leaveAllChannels();
     return;
   }
   for (std::vector<std::string>::const_iterator it = channels.begin();
@@ -710,22 +747,6 @@ void Client::_authenticate() {
   createMessage(Server::RPL_YOURHOST);
   createMessage(Server::RPL_CREATED);
   createMessage(Server::RPL_MYINFO);
-}
-
-void Client::_broadcastNickChange(const std::string &newNick) {
-  // TODO: get rid of this function
-  // TODO: call broadcast to all channels of the client function
-  const std::string msg =
-      ":" + _nick + "!~" + _user + "@" + _hostname + " NICK :" + newNick;
-
-  // to self
-  _server->sendToClient(this, msg);
-
-  // to the user's channels
-  for (ChannelList::const_iterator it = _channels.begin();
-       it != _channels.end(); ++it) {
-    _server->sendToChannel(it->second, msg);
-  }
 }
 
 void Client::appendToOutBuffer(const std::string &msg) {
