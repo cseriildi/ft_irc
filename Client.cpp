@@ -133,7 +133,7 @@ void Client::nick(const std::vector<std::string> &msg) {
     return;
   }
   if (_isAuthenticated) {
-    _broadcastNickChange(nick);
+    broadcastToAllChannels(nick, "NICK", true, false);
   }
   _nick = nick;
   _isNickSet = true;
@@ -195,12 +195,35 @@ void Client::leaveAllChannels() {
   }
 }
 
-void Client::broadcastToAllChannels(const std::string &msg, const std::string &command) {
+void Client::_broadcastNickChange(const std::string &newNick) {
+  const std::string msg =
+      ":" + _nick + "!~" + _user + "@" + _hostname + " NICK :" + newNick;
+
+  // to self
+  _server->sendToClient(this, msg);
+
+  // to the user's channels
   for (ChannelList::const_iterator it = _channels.begin();
        it != _channels.end(); ++it) {
-    _server->sendToChannel(it->second, ":" + _nick + "!~" + _user + "@" +
-                                        _hostname + " " + command + " " +
-                                        it->second->getName() + " :" + msg);
+    _server->sendToChannel(it->second, msg);
+  }
+}
+
+void Client::broadcastToAllChannels(const std::string &msg, const std::string &command, bool toSelf, bool withChannelName) {
+  if (toSelf) {
+    _server->sendToClient(this, ":" + _nick + "!~" + _user + "@" + _hostname +
+                                        " " + command + " :" + msg);
+  }
+  for (ChannelList::const_iterator it = _channels.begin();
+       it != _channels.end(); ++it) {
+    std::string fullMsg = ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " " + command;
+    if (withChannelName) {
+      fullMsg += " " + it->second->getName();
+    }
+    fullMsg += " :" + msg;
+
+    _server->sendToChannel(it->second, fullMsg);
   }
 }
 
@@ -698,20 +721,6 @@ void Client::_authenticate() {
   createMessage(Server::RPL_YOURHOST);
   createMessage(Server::RPL_CREATED);
   createMessage(Server::RPL_MYINFO);
-}
-
-void Client::_broadcastNickChange(const std::string &newNick) {
-  const std::string msg =
-      ":" + _nick + "!~" + _user + "@" + _hostname + " NICK :" + newNick;
-
-  // to self
-  _server->sendToClient(this, msg);
-
-  // to the user's channels
-  for (ChannelList::const_iterator it = _channels.begin();
-       it != _channels.end(); ++it) {
-    _server->sendToChannel(it->second, msg);
-  }
 }
 
 void Client::appendToOutBuffer(const std::string &msg) {
