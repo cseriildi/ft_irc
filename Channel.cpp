@@ -37,10 +37,6 @@ void Channel::setTopic(const std::string &topic) {
   _topic = topic;
   _topicSet = true;
 }
-void Channel::setPassword(const std::string &password) {
-  _password = password;
-  _passRequired = true;
-}
 void Channel::setInviteOnly(bool inviteOnly) { _isInviteOnly = inviteOnly; }
 void Channel::setTopicSet(bool topicSet) { _topicSet = topicSet; }
 void Channel::setPassRequired(bool passRequired) {
