@@ -184,16 +184,10 @@ void Client::ping(const std::vector<std::string> &msg) {
   }
 }
 
-void Client::leaveAllChannels(const std::string &reason,
-                              const std::string &command) {
-  std::cout << "leaveAllChannels called with reason: " << reason
-            << " and command: " << command << '\n';
+void Client::leaveAllChannels() {
   for (ChannelList::iterator it = _channels.begin(); it != _channels.end();
        ++it) {
     Channel *channel = it->second;
-    _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
-                                        _hostname + " " + command + " " +
-                                        channel->getName() + " :" + reason);
     channel->removeClient(_clientFd);
     if (channel->getClients().empty()) {
       _server->removeChannel(channel->getName());
@@ -201,12 +195,23 @@ void Client::leaveAllChannels(const std::string &reason,
   }
 }
 
-void Client::quit(const std::vector<std::string> &msg) {
-  const std::string reason =
-      (msg.size() > 1 ? msg[1] : "Client Quit");  // TODO: msg[1]?
+void Client::broadcastToAllChannels(const std::string &msg, const std::string &command) {
+  for (ChannelList::const_iterator it = _channels.begin();
+       it != _channels.end(); ++it) {
+    _server->sendToChannel(it->second, ":" + _nick + "!~" + _user + "@" +
+                                        _hostname + " " + command + " " +
+                                        it->second->getName() + " :" + msg);
+  }
+}
 
-  std::cout << "leaveAll called in quit\n";
-  leaveAllChannels(reason, "QUIT"); // TODO: wrong message?
+void Client::quit(const std::vector<std::string> &msg) {
+  // const std::string reason =
+  //    (msg.size() > 1 ? msg[1] : "Client Quit");  // TODO: msg[1]?
+
+  (void)msg;
+  const std::string reason = "Client Quit";
+  broadcastToAllChannels(reason, "QUIT");
+  leaveAllChannels();
   _wantsToQuit = true;
 }
 
@@ -289,8 +294,8 @@ void Client::join(const std::vector<std::string> &msg) {
   const std::vector<std::string> keys =
       split((msg.size() > 2 ? msg[2] : ""), ',');
   if (*channels.begin() == "0") {
-	std::cout << "leaveAllChannels called in join with 0\n";
-    leaveAllChannels("Client left all channels", "PART");  // TODO: same as part
+    broadcastToAllChannels("", "PART");
+    leaveAllChannels();
     return;
   }
   for (std::vector<std::string>::const_iterator it = channels.begin();
