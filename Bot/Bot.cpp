@@ -1,15 +1,21 @@
 #include "Bot.hpp"
 #include <arpa/inet.h>
+#include <cstddef>
 #include <iostream>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 
 Bot::Bot(const std::string &port, const std::string &password) : _sockfd(-1) {
 
     std::cout << "Bot constructor called with port: " << port << " and password: " << password << "\n";
     int portNbr = 0;
     std::istringstream(port) >> portNbr;
-    if (portNbr <= 0 || portNbr > 65535) {
+    if (portNbr <= 0 || portNbr > MAX_PORT) {
         throw std::invalid_argument("Invalid port number: " + port);
     }
 
@@ -28,7 +34,7 @@ Bot::Bot(const std::string &port, const std::string &password) : _sockfd(-1) {
         throw std::runtime_error("Connection to server failed");
     }
     std::cout << "Bot connected to server on port " << port << "\n";
-    std::string message = "PASS " + password + "\r\n NICK Bot\r\n USER Bot 0 * :Bot\r\n JOIN #weather\r\n";
+    const std::string message = "PASS " + password + "\r\n NICK Bot\r\n USER Bot 0 * :Bot\r\n JOIN #echo\r\n";
     send(_sockfd, message.c_str(), message.size(), 0);
     std::cout << "Bot sent initial message to server\n";
     run();
@@ -37,28 +43,28 @@ Bot::Bot(const std::string &port, const std::string &password) : _sockfd(-1) {
 void Bot::run() {
     char buffer[BUFFER_SIZE];
     while (true) {
-        ssize_t bytesRead = recv(_sockfd, buffer, sizeof(buffer) - 1, 0);
+        const ssize_t bytesRead = recv(_sockfd, buffer, sizeof(buffer) - 1, 0);
         if (bytesRead <= 0) {
             std::cerr << "Connection lost or error occurred.\n";
             break;
         }
 
         buffer[bytesRead] = '\0';
-        std::string msg(buffer);
+        const std::string msg(buffer);
 
-        std::cout << "Received:\n" << msg << std::endl;
+        std::cout << "Received:\n" << msg << "\n";
 
         // Respond to PING to stay connected
         if (msg.find("PING") != std::string::npos) {
-            size_t pingPos = msg.find("PING");
-            std::string response = "PONG" + msg.substr(pingPos + 4) + "\r\n";
+            const size_t pingPos = msg.find("PING");
+            const std::string response = "PONG" + msg.substr(pingPos + 4) + "\r\n";
             send(_sockfd, response.c_str(), response.size(), 0);
             std::cout << "Sent: " << response;
         }
 
-        // If someone sends a message to #weather
-        if (msg.find("PRIVMSG #weather :") != std::string::npos) {
-            std::string reply = "PRIVMSG #weather :weather\r\n";
+        if (msg.find("PRIVMSG #echo :") != std::string::npos) {
+            const std::string echoMsg = msg.substr(msg.find("PRIVMSG #echo :") + 15);
+            const std::string reply = "PRIVMSG #echo :" + echoMsg + "\r\n";
             send(_sockfd, reply.c_str(), reply.size(), 0);
             std::cout << "Sent: " << reply;
         }
@@ -75,10 +81,11 @@ Bot::~Bot() {
     }
 }
 
-Bot::Bot(const Bot &other) { (void)other; }
+Bot::Bot(const Bot &other) : _sockfd(other._sockfd) {}
 
 Bot &Bot::operator=(const Bot &other) {
     if (this != &other) {
+        _sockfd = other._sockfd;
     }
     return *this;
 }
