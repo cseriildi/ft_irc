@@ -1,6 +1,13 @@
 NAME = ircserv
 
-SRCS = main.cpp Server.cpp Client.cpp Channel.cpp utils.cpp
+SRCS = main.cpp \
+				Server.cpp \
+				Client.cpp \
+				ClientCommands.cpp \
+				ClientCommunication.cpp \
+				ClientHelpers.cpp \
+				Channel.cpp \
+				utils.cpp
 
 CXX = c++
 
