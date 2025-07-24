@@ -64,7 +64,7 @@ Server::Server(const std::string &port, const std::string &pass)
       _sockfdIpv4(-1),
       _sockfdIpv6(-1),
       _res(NULL),
-      _name("localhost"),  // TODO
+      _name("ft_irc"),  // TODO
       _password(pass),
       _createdAt(std::time(NULL)) {
   _isPassRequired = !_password.empty();
