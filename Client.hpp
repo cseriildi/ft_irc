@@ -5,6 +5,7 @@
 #include <ctime>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Server.hpp"
@@ -16,6 +17,7 @@ class Channel;
 
 typedef void (Client::*CommandFunction)(const std::vector<std::string> &);
 typedef std::map<std::string, Channel *> ChannelList;
+typedef std::vector<std::pair<char, char> > ModeChanges;
 
 class Client {
  public:
@@ -76,6 +78,12 @@ class Client {
   void leaveAllChannels();
   void broadcastToAllChannels(const std::string &msg,
                               const std::string &command = "");
+  void joinChannel(Channel *channel);
+  bool modeCheck(const std::string &modes, Channel *channel,
+                 std::vector<std::string> &params);
+  Channel *findChannelForMode(const std::vector<std::string> &msg);
+  ModeChanges changeMode(std::vector<std::string> &params, Channel *channel,
+                         const std::string &modes);
 
   // * COMMUNICATION *
   void receive();
