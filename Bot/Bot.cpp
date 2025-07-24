@@ -53,6 +53,7 @@ Bot::Bot(const std::string &port, const std::string &password) : _sockfd(-1) {
     _trivia.push_back(line);
   }
   triviaFile.close();
+  std::srand(time(NULL));
   run();
 }
 
@@ -69,7 +70,6 @@ void Bot::run() const {
     const std::string msg(buffer);
 
     size_t triviaIndex = 0;
-    std::srand(time(NULL));
     if (msg.find("PRIVMSG #trivia :") != std::string::npos) {
       triviaIndex = std::rand() % _trivia.size();
       const std::string reply =
