@@ -31,18 +31,17 @@ Bot::Bot(const std::string &port, const std::string &password) : _sockfd(-1) {
   if (_sockfd < 0) {
     throw std::runtime_error("Socket creation failed");
   }
-  if (connect(_sockfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) <
-      0) {
+  if (connect(_sockfd, (struct sockaddr *)&serverAddr,  // NOLINT
+              sizeof(serverAddr)) < 0) {
     close(_sockfd);
     _sockfd = -1;
     throw std::runtime_error("Connection to server failed");
   }
   std::cout << "Bot connected to server on port " << port << "\n";
-  const std::string message =
+  sendMessage(
       "PASS " + password +
       "\r\nNICK Bot\r\nUSER Bot 0 * :Bot\r\nJOIN #trivia\r\nTOPIC #trivia "
-      ":Send any message to receive a ¡FUN! fact!\r\n";
-  send(_sockfd, message.c_str(), message.size(), 0);
+      ":Send any message to receive a ¡FUN! fact!\r\n");
   std::ifstream triviaFile("trivia.txt");
   if (!triviaFile.is_open()) {
     std::cerr << "Failed to open trivia file\n";
@@ -57,35 +56,42 @@ Bot::Bot(const std::string &port, const std::string &password) : _sockfd(-1) {
   run();
 }
 
+void Bot::sendMessage(const std::string &message) const {
+  send(_sockfd, message.c_str(), message.size(), 0);
+}
+
 void Bot::run() const {
   char buffer[BUFFER_SIZE];
   while (true) {
-    const ssize_t bytesRead = recv(_sockfd, buffer, sizeof(buffer) - 1, 0);
+    const ssize_t bytesRead =
+        recv(_sockfd, buffer, sizeof(buffer) - 1, 0);  // NOLINT
     if (bytesRead <= 0) {
       std::cerr << "Connection lost or error occurred.\n";
       break;
     }
 
-    buffer[bytesRead] = '\0';
-    const std::string msg(buffer);
+    buffer[bytesRead] = '\0';       // NOLINT
+    const std::string msg(buffer);  // NOLINT
 
     size_t triviaIndex = 0;
     if (msg.find("PRIVMSG #trivia :") != std::string::npos) {
+      if (_trivia.empty()) {
+        std::string const reply = "PRIVMSG #trivia :404 Trivia not found.\r\n";
+        send(_sockfd, reply.c_str(), reply.size(), 0);
+        continue;
+      }
       triviaIndex = std::rand() % _trivia.size();
       const std::string reply =
           "PRIVMSG #trivia :" + _trivia[triviaIndex] + "\r\n";
       send(_sockfd, reply.c_str(), reply.size(), 0);
     } else if (msg.find("KICK #trivia Bot") != std::string::npos) {
-      std::string rejoinMsg =
-          "JOIN #trivia\r\nTOPIC #trivia "
-          ":Send any message to receive a ¡FUN! fact!\r\n";
-      send(_sockfd, rejoinMsg.c_str(), rejoinMsg.size(), 0);
-      send(_sockfd, "PRIVMSG #trivia :I'm back b*tches!\r\n", 36, 0);
+      sendMessage(
+          "JOIN #trivia\r\nTOPIC #trivia :Send any message to receive a ¡FUN! "
+          "fact!\r\n");
+      sendMessage("PRIVMSG #trivia :I'm back b*tches!\r\n");
     }
   }
 }
-
-Bot::Bot() : _sockfd(-1) {}
 
 Bot::~Bot() {
   if (_sockfd != -1) {
@@ -93,13 +99,4 @@ Bot::~Bot() {
     _sockfd = -1;
     std::cout << "Bot socket closed\n";
   }
-}
-
-Bot::Bot(const Bot &other) : _sockfd(other._sockfd) {}
-
-Bot &Bot::operator=(const Bot &other) {
-  if (this != &other) {
-    _sockfd = other._sockfd;
-  }
-  return *this;
 }
