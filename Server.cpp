@@ -64,7 +64,7 @@ Server::Server(const std::string &port, const std::string &pass)
       _sockfdIpv4(-1),
       _sockfdIpv6(-1),
       _res(NULL),
-      _name("localhost"),  // TODO
+      _name("ft_irc"),  // TODO
       _password(pass),
       _createdAt(std::time(NULL)) {
   _isPassRequired = !_password.empty();
@@ -124,6 +124,11 @@ void Server::_cleanup() {
     delete it->second;
   }
   _clients.clear();
+  ChannelList::iterator itch;
+  for (itch = _channels.begin(); itch != _channels.end(); ++itch) {
+    delete itch->second;
+  }
+  _channels.clear();
 }
 
 int Server::_bindAndListen(const struct addrinfo *res) {

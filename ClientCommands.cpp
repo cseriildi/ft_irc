@@ -232,7 +232,8 @@ void Client::part(const std::vector<std::string> &msg) {
     }
     const std::string reason = (msg.size() > 2 ? msg[2] : "");
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
-                                        _hostname + " PART " + name + " :" +
+                                        _hostname + " PART " + name +
+                                        " :" +  // NOLINT
                                         reason);
     removeChannel(name);
   }
@@ -278,12 +279,13 @@ void Client::kick(const std::vector<std::string> &msg) {
     }
     Client *targetClient = findClient(channel->getClients(), nick);
     if (targetClient == NULL) {
-      createMessage(Server::ERR_USERNOTINCHANNEL, nick + " " + channelName);
+      createMessage(Server::ERR_USERNOTINCHANNEL,
+                    nick + " " + channelName);  // NOLINT
       continue;
     }
     _server->sendToChannel(channel, ":" + _nick + "!~" + _user + "@" +
                                         _hostname + " KICK " + channelName +
-                                        " " + nick + " :" + reason);
+                                        " " + nick + " :" + reason);  // NOLINT
     targetClient->removeChannel(channelName);
   }
 }
