@@ -13,7 +13,7 @@ class Bot {
         Bot();
         Bot(const Bot &other);
         Bot &operator=(const Bot &other);
-        void run();
+        void run() const;
 
         int _sockfd;
 };

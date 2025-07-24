@@ -1,4 +1,5 @@
 #include "Bot.hpp"
+#include <exception>
 #include <iostream>
 
 int main(int argc, char **argv) {
@@ -8,7 +9,7 @@ int main(int argc, char **argv) {
     }
 
     try {
-        Bot bot(argv[1], argv[2]);
+        Bot const bot(argv[1], argv[2]);
     } catch (const std::exception &e) {
         std::cerr << e.what() << "\n";
         return 1;
