@@ -124,6 +124,11 @@ void Server::_cleanup() {
     delete it->second;
   }
   _clients.clear();
+  ChannelList::iterator itch;
+  for (itch = _channels.begin(); itch != _channels.end(); ++itch) {
+    delete itch->second;
+  }
+  _channels.clear();
 }
 
 int Server::_bindAndListen(const struct addrinfo *res) {
