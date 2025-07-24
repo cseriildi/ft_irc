@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #define BUFFER_SIZE 512  // standard message size for IRC
 #define MAX_PORT 65535
@@ -16,4 +17,5 @@ class Bot {
         void run() const;
 
         int _sockfd;
+        std::vector<std::string> _trivia;
 };

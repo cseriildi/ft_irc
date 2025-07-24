@@ -1,6 +1,9 @@
 #include "Bot.hpp"
 #include <arpa/inet.h>
 #include <cstddef>
+#include <cstdlib>
+#include <ctime>
+#include <fstream>
 #include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -11,8 +14,6 @@
 #include <string>
 
 Bot::Bot(const std::string &port, const std::string &password) : _sockfd(-1) {
-
-    std::cout << "Bot constructor called with port: " << port << " and password: " << password << "\n";
     int portNbr = 0;
     std::istringstream(port) >> portNbr;
     if (portNbr <= 0 || portNbr > MAX_PORT) {
@@ -34,9 +35,18 @@ Bot::Bot(const std::string &port, const std::string &password) : _sockfd(-1) {
         throw std::runtime_error("Connection to server failed");
     }
     std::cout << "Bot connected to server on port " << port << "\n";
-    const std::string message = "PASS " + password + "\r\n NICK Bot\r\n USER Bot 0 * :Bot\r\n JOIN #echo\r\n";
+    const std::string message = "PASS " + password + "\r\n NICK Bot\r\n USER Bot 0 * :Bot\r\n JOIN #trivia\r\n";
     send(_sockfd, message.c_str(), message.size(), 0);
-    std::cout << "Bot sent initial message to server\n";
+    std::ifstream triviaFile("trivia.txt");
+    if (!triviaFile.is_open()) {
+        std::cerr << "Failed to open trivia file\n";
+        return;
+    }
+    std::string line;
+    while (std::getline(triviaFile, line) != 0) {
+        _trivia.push_back(line);
+    }
+    triviaFile.close();
     run();
 }
 
@@ -52,20 +62,18 @@ void Bot::run() const {
         buffer[bytesRead] = '\0';
         const std::string msg(buffer);
 
-        std::cout << "Received:\n" << msg << "\n";
-
         if (msg.find("PING") != std::string::npos) {
             const size_t pingPos = msg.find("PING");
             const std::string response = "PONG" + msg.substr(pingPos + 4) + "\r\n";
             send(_sockfd, response.c_str(), response.size(), 0);
-            std::cout << "Sent: " << response;
         }
 
-        if (msg.find("PRIVMSG #echo :") != std::string::npos) {
-            const std::string echoMsg = msg.substr(msg.find("PRIVMSG #echo :") + 15);
-            const std::string reply = "PRIVMSG #echo :" + echoMsg + "\r\n";
+        size_t triviaIndex = 0;
+        std::srand(time(NULL));
+        if (msg.find("PRIVMSG #trivia :") != std::string::npos) {
+            triviaIndex = std::rand() % _trivia.size();
+            const std::string reply = "PRIVMSG #trivia :" + _trivia[triviaIndex] + "\r\n";
             send(_sockfd, reply.c_str(), reply.size(), 0);
-            std::cout << "Sent: " << reply;
         }
     }
 }
