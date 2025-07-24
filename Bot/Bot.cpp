@@ -40,7 +40,7 @@ Bot::Bot(const std::string &port, const std::string &password) : _sockfd(-1) {
     run();
 }
 
-void Bot::run() const {
+void Bot::run() {
     char buffer[BUFFER_SIZE];
     while (true) {
         const ssize_t bytesRead = recv(_sockfd, buffer, sizeof(buffer) - 1, 0);
@@ -54,6 +54,7 @@ void Bot::run() const {
 
         std::cout << "Received:\n" << msg << "\n";
 
+        // Respond to PING to stay connected
         if (msg.find("PING") != std::string::npos) {
             const size_t pingPos = msg.find("PING");
             const std::string response = "PONG" + msg.substr(pingPos + 4) + "\r\n";
