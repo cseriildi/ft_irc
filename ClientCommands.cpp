@@ -360,7 +360,6 @@ void Client::topic(const std::vector<std::string> &msg) {
     createMessage(Server::RPL_TOPIC, channel);
   }
 }
-#include "colors.hpp"
 void Client::mode(const std::vector<std::string> &msg) {
   Channel *channel = findChannelForMode(msg);
   if (channel == NULL) {
