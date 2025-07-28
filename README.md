@@ -58,3 +58,33 @@ nc -C localhost 6667
 ```
 *Note: netcat is very manual, irssi retrieves the information required for authentication from the system and has separate windows for channels and private messages so you can read them separately and switch between them seamlessly. Irssi might modify your commands based on which window you are focused on, but you can send direct messages to the server with `/quote <command>`.*
 
+## Bonus Usage
+
+**File transfer using irssi**
+
+Setup:
+```
+/load dcc
+/set dcc_download_path <path>
+```
+Usage:
+
+- Client 1:
+
+```
+/dcc send <nick> <file_path>
+```
+- Client 2:
+```
+/dcc list (optional)
+/dcc get <nick> <filename>
+```
+
+**Bot usage**
+
+After starting the server
+```Bash
+make run -C Bot ARGS="<port> <pass>"
+```
+
+*Note: It will create/join a channel called Trivia where it will send a funfact to any given message.*
