@@ -54,7 +54,7 @@ Test with any IRC client, for example:
 irssi -c localhost -p 6667 -w pass
 ```
 ```bash
-nc localhost 6667
+nc -C localhost 6667
 ```
 *Note: netcat is very manual, irssi retrieves the information required for authentication from the system and has separate windows for channels and private messages so you can read them separately and switch between them seamlessly. Irssi might modify your commands based on which window you are focused on, but you can send direct messages to the server with `/quote <command>`.*
 
