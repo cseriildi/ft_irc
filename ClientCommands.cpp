@@ -14,9 +14,6 @@
 #include "utils.hpp"
 
 void Client::handle(const std::string &msg) {
-#ifdef DEBUG
-  std::cout << "< Received: " << msg << '\n';
-#endif
   std::vector<std::string> parsed = parse(msg);
 
   if (parsed.empty()) {
@@ -38,8 +35,9 @@ void Client::handle(const std::string &msg) {
 }
 
 void Client::pass(const std::vector<std::string> &msg) {
-  if (_isPassSet) {
+  if (_isPassSet || _isNickSet || _isUserSet) {
     createMessage(Server::ERR_ALREADYREGISTRED);
+    _wantsToQuit = true;
     return;
   }
   if (msg.size() < 2) {

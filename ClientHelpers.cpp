@@ -38,6 +38,7 @@ void Client::_authenticate() {
   if (_server->isPassRequired() &&
       (!_isPassSet || _server->getPassword() != _password)) {
     createMessage(Server::ERR_PASSWDMISMATCH);
+    _wantsToQuit = true;
     return;
   }
   _joinedAt = time(NULL);

@@ -274,6 +274,7 @@ void Server::removeClient(int fd) {
   if (client == NULL) {
     return;
   }
+  client->answer();
   if (!client->wantsToQuit()) {
     client->broadcastToAllChannels("Client disconnected", "QUIT");
     client->leaveAllChannels();

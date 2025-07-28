@@ -30,7 +30,9 @@ void Client::receive() {
                              std::string(strerror(errno)));
   }
   _inBuffer.append(buffer, received);  // NOLINT
-
+#ifdef DEBUG
+  std::cout << "< " << buffer << '\n';
+#endif
   size_t pos = 0;
   while ((pos = _inBuffer.find("\r\n")) != std::string::npos) {
     std::string const line = _inBuffer.substr(0, pos);
@@ -41,7 +43,7 @@ void Client::receive() {
 
 void Client::answer() {
 #ifdef DEBUG
-  std::cout << "> Answered: " << _outBuffer << '\n';
+  std::cout << "> " << _outBuffer << '\n';
 #endif
 
   while (!_outBuffer.empty()) {
