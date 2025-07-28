@@ -89,7 +89,8 @@ Client *findClient(const ClientList &clients, const std::string &nick) {
   const std::string l_nick = lowercase(nick);
   for (ClientList::const_iterator it = clients.begin(); it != clients.end();
        ++it) {
-    if (lowercase(it->second->getNick()) == l_nick) {
+    if (it->second->isAuthenticated() &&
+        lowercase(it->second->getNick()) == l_nick) {
       return it->second;
     }
   }
