@@ -9,3 +9,4 @@
 !*.yml
 !.clangd
 !.clang-format
+!*.txt
