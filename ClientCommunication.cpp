@@ -37,7 +37,7 @@ void Client::receive() {
   while ((pos = _inBuffer.find("\r\n")) != std::string::npos) {
     std::string const line = _inBuffer.substr(0, pos);
     if (line.size() > MAX_BUFFER_SIZE - 2) {
-      std::cerr << "Received line too long, ignoring: " << line << '\n';
+      std::cerr << "Received line too long, ignoring\n";
       _inBuffer.erase(0, pos + 2);
       continue;
     }
@@ -46,6 +46,7 @@ void Client::receive() {
   }
   if (_inBuffer.size() > MAX_BUFFER_SIZE - 2) {
     _inBuffer.clear();
+    std::cerr << "Input buffer overflow, clearing buffer\n";
     return;
   }
 }
