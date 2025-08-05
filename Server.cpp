@@ -25,6 +25,8 @@
 
 extern volatile sig_atomic_t g_terminate;  // NOLINT
 
+const std::string Server::SPECIAL_CHARS = "[]\\`_^{}|";
+
 const std::map<Server::ERR, std::string> Server::ERRORS = init_error_map();
 
 std::map<Server::ERR, std::string> Server::init_error_map() {

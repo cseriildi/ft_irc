@@ -73,6 +73,7 @@ class Server {
   };
 
   static const std::map<ERR, std::string> ERRORS;
+  static const std::string SPECIAL_CHARS;
 
   Server(const std::string &port = "6667", const std::string &password = "");
   ~Server();
