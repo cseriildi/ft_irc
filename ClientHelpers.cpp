@@ -8,15 +8,20 @@
 
 #include "Channel.hpp"
 #include "Client.hpp"
+#include "Server.hpp"
 #include "utils.hpp"
 
 bool Client::isValidName(const std::string &name) {
-  if (name.empty() || name.length() > 50 || std::isalpha(name[0]) == 0 ||
-      name.find_first_of(" ,:") != std::string::npos) {
+  if (name.empty() ||
+      (std::isalpha(name[0]) == 0 &&
+       Server::SPECIAL_CHARS.find(name[0]) == std::string::npos) ||
+      name.length() > 9) {
     return false;
   }
-  for (std::string::const_iterator it = name.begin(); it != name.end(); ++it) {
-    if (std::isprint(*it) == 0) {
+  for (size_t i = 1; i < name.length(); ++i) {
+    if (std::isalnum(name[i]) == 0 &&
+        Server::SPECIAL_CHARS.find(name[i]) == std::string::npos &&
+        name[i] != '-') {
       return false;
     }
   }
